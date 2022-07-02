@@ -20,6 +20,7 @@ var flags struct {
 	showsVersion    bool
 	verbose         bool
 	listens         bool
+	usesUdp         bool
 }
 
 func init() {
@@ -32,6 +33,7 @@ func init() {
 	RootCmd.Flags().BoolVarP(&flags.showsVersion, "version", "V", false, "show version")
 	RootCmd.Flags().BoolVarP(&flags.verbose, "verbose", "v", false, "verbose output")
 	RootCmd.Flags().BoolVarP(&flags.listens, "listen", "l", false, "listen mode")
+	RootCmd.Flags().BoolVarP(&flags.usesUdp, "udp", "u", false, "UDP")
 }
 
 var RootCmd = &cobra.Command{
@@ -46,10 +48,9 @@ var RootCmd = &cobra.Command{
 		if len(args) != 2 {
 			return fmt.Errorf("port and path are required")
 		}
-		// TODO: support UDP
-		tcpPortStr := args[0]
+		portStr := args[0]
 		path := args[1]
-		tcpPort, err := strconv.Atoi(tcpPortStr)
+		port, err := strconv.Atoi(portStr)
 		if err != nil {
 			return err
 		}
@@ -59,9 +60,15 @@ var RootCmd = &cobra.Command{
 		} else {
 			logger = log.New(io.Discard, "", 0)
 		}
-		if flags.listens {
-			return core.Listener(logger, flags.pipingServerUrl, uint16(tcpPort), path)
+		if flags.usesUdp {
+			if flags.listens {
+				return core.Listener(logger, flags.pipingServerUrl, core.NetworkTypeUdp, uint16(port), path)
+			}
+			return core.Dialer(logger, flags.pipingServerUrl, core.NetworkTypeUdp, uint16(port), path)
 		}
-		return core.Dialer(logger, flags.pipingServerUrl, uint16(tcpPort), path)
+		if flags.listens {
+			return core.Listener(logger, flags.pipingServerUrl, core.NetworkTypeTcp, uint16(port), path)
+		}
+		return core.Dialer(logger, flags.pipingServerUrl, core.NetworkTypeTcp, uint16(port), path)
 	},
 }

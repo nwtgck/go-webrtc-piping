@@ -12,12 +12,18 @@ import (
 	"strconv"
 )
 
-func Dialer(logger *log.Logger, pipingServerUrl string, tcpPort uint16, path string) error {
+func Dialer(logger *log.Logger, pipingServerUrl string, networkType NetworkType, port uint16, path string) error {
 	logger.Printf("answer-side")
 	errCh := make(chan error)
 
-	// Create a new RTCPeerConnection
-	peerConnection, err := NewDetachablePeerConnection(createConfig())
+	var peerConnection *webrtc.PeerConnection
+	var err error
+	if networkType == NetworkTypeTcp {
+		peerConnection, err = NewDetachablePeerConnection(createConfig())
+	} else {
+		// NOTE: UDP does not need to detach
+		peerConnection, err = webrtc.NewPeerConnection(createConfig())
+	}
 	if err != nil {
 		return err
 	}
@@ -43,13 +49,12 @@ func Dialer(logger *log.Logger, pipingServerUrl string, tcpPort uint16, path str
 			errCh <- nil
 		}
 	})
-
-	// Register data channel creation handling
-	peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
-		logger.Printf("OnDataChannel")
-		// Register channel opening handling
-		tcpDialer(logger, d, tcpPort)
-	})
+	switch networkType {
+	case NetworkTypeTcp:
+		tcpDialer(logger, peerConnection, port)
+	case NetworkTypeUdp:
+		udpDialer(logger, peerConnection, port)
+	}
 
 	go func() {
 		answer := piping_webrtc_signaling.NewAnswer(logger, pipingServerUrl, peerConnection, answerSideId(path), offerSideId(path))
@@ -61,21 +66,62 @@ func Dialer(logger *log.Logger, pipingServerUrl string, tcpPort uint16, path str
 	return <-errCh
 }
 
-func tcpDialer(logger *log.Logger, dataChannel *webrtc.DataChannel, tcpPort uint16) {
-	dataChannel.OnOpen(func() {
-		logger.Printf("OnOpen")
-		raw, err := dataChannel.Detach()
+func tcpDialer(logger *log.Logger, peerConnection *webrtc.PeerConnection, port uint16) {
+	// Register data channel creation handling
+	peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
+		logger.Printf("OnDataChannel")
+		// Register channel opening handling
+		d.OnOpen(func() {
+			logger.Printf("OnOpen")
+			raw, err := d.Detach()
+			if err != nil {
+				logger.Printf("failed to detach: %+v", err)
+				return
+			}
+			conn, err := net.Dial("tcp", ":"+strconv.Itoa(int(port)))
+			if err != nil {
+				logger.Printf("failed to dial", err)
+				raw.Close()
+				return
+			}
+			go io.Copy(raw, conn)
+			go io.Copy(conn, raw)
+		})
+	})
+}
+
+func udpDialer(logger *log.Logger, peerConnection *webrtc.PeerConnection, port uint16) {
+	// Register data channel creation handling
+	peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
+		logger.Printf("OnDataChannel")
+		// TODO: hard code: 127.0.0.1
+		conn, err := net.Dial("udp", net.JoinHostPort("127.0.0.1", strconv.Itoa(int(port))))
 		if err != nil {
-			logger.Printf("failed to detach: %+v", err)
+			log.Printf("failed to dial: %v", err)
+			d.Close()
 			return
 		}
-		conn, err := net.Dial("tcp", ":"+strconv.Itoa(int(tcpPort)))
-		if err != nil {
-			logger.Printf("failed to dial", err)
-			raw.Close()
-			return
-		}
-		go io.Copy(raw, conn)
-		go io.Copy(conn, raw)
+		// Register channel opening handling
+		d.OnOpen(func() {
+			logger.Printf("data channel OnOpen")
+			var buf [65536]byte
+			for {
+				n, err := conn.Read(buf[:])
+				if err != nil {
+					logger.Printf("failed to read: %+v", err)
+					return
+				}
+				if err := d.Send(buf[:n]); err != nil {
+					logger.Printf("failed to send: %+v", err)
+					return
+				}
+			}
+		})
+
+		d.OnMessage(func(msg webrtc.DataChannelMessage) {
+			if _, err := conn.Write(msg.Data); err != nil {
+				logger.Printf("failed to write: %+v", err)
+			}
+		})
 	})
 }
