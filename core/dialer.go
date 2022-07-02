@@ -48,22 +48,7 @@ func Dialer(logger *log.Logger, pipingServerUrl string, tcpPort uint16, path str
 	peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
 		logger.Printf("OnDataChannel")
 		// Register channel opening handling
-		d.OnOpen(func() {
-			logger.Printf("OnOpen")
-			raw, err := d.Detach()
-			if err != nil {
-				logger.Printf("failed to detach: %+v", err)
-				return
-			}
-			conn, err := net.Dial("tcp", ":"+strconv.Itoa(int(tcpPort)))
-			if err != nil {
-				logger.Printf("failed to dial", err)
-				raw.Close()
-				return
-			}
-			go io.Copy(raw, conn)
-			go io.Copy(conn, raw)
-		})
+		tcpDialer(logger, d, tcpPort)
 	})
 
 	go func() {
@@ -74,4 +59,23 @@ func Dialer(logger *log.Logger, pipingServerUrl string, tcpPort uint16, path str
 	}()
 
 	return <-errCh
+}
+
+func tcpDialer(logger *log.Logger, dataChannel *webrtc.DataChannel, tcpPort uint16) {
+	dataChannel.OnOpen(func() {
+		logger.Printf("OnOpen")
+		raw, err := dataChannel.Detach()
+		if err != nil {
+			logger.Printf("failed to detach: %+v", err)
+			return
+		}
+		conn, err := net.Dial("tcp", ":"+strconv.Itoa(int(tcpPort)))
+		if err != nil {
+			logger.Printf("failed to dial", err)
+			raw.Close()
+			return
+		}
+		go io.Copy(raw, conn)
+		go io.Copy(conn, raw)
+	})
 }

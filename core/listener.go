@@ -56,33 +56,9 @@ func Listener(logger *log.Logger, pipingServerUrl string, tcpPort uint16, path s
 	})
 
 	go func() {
-		ln, err := net.Listen("tcp", ":"+strconv.Itoa(int(tcpPort)))
-		if err != nil {
+		if err := tcpListener(logger, peerConnection, tcpPort); err != nil {
 			errCh <- err
 			return
-		}
-		for {
-			conn, err := ln.Accept()
-			if err != nil {
-				errCh <- err
-				return
-			}
-			logger.Printf("accepted")
-			dataChannel, err := peerConnection.CreateDataChannel("data", nil)
-			if err != nil {
-				errCh <- err
-				return
-			}
-			dataChannel.OnOpen(func() {
-				logger.Printf("OnOpen in listener")
-				raw, err := dataChannel.Detach()
-				if err != nil {
-					logger.Printf("failed to detach: %+v", err)
-					return
-				}
-				go io.Copy(raw, conn)
-				go io.Copy(conn, raw)
-			})
 		}
 	}()
 
@@ -94,4 +70,32 @@ func Listener(logger *log.Logger, pipingServerUrl string, tcpPort uint16, path s
 	}()
 
 	return <-errCh
+}
+
+func tcpListener(logger *log.Logger, peerConnection *webrtc.PeerConnection, tcpPort uint16) error {
+	ln, err := net.Listen("tcp", ":"+strconv.Itoa(int(tcpPort)))
+	if err != nil {
+		return err
+	}
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			return err
+		}
+		logger.Printf("accepted")
+		dataChannel, err := peerConnection.CreateDataChannel("data", nil)
+		if err != nil {
+			return err
+		}
+		dataChannel.OnOpen(func() {
+			logger.Printf("OnOpen in listener")
+			raw, err := dataChannel.Detach()
+			if err != nil {
+				logger.Printf("failed to detach: %+v", err)
+				return
+			}
+			go io.Copy(raw, conn)
+			go io.Copy(conn, raw)
+		})
+	}
 }
