@@ -1,0 +1,56 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  build_multi_platform:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.18
+      - name: Build for multi-platform
+        run: |
+          set -xeu
+          DIST=dist
+          mkdir $DIST
+          # (from: https://www.digitalocean.com/community/tutorials/how-to-build-go-executables-for-multiple-platforms-on-ubuntu-16-04)
+          platforms=("linux/amd64" "darwin/amd64" "windows/amd64" "linux/arm")
+          for platform in "${platforms[@]}"
+          do
+              platform_split=(${platform//\// })
+              export GOOS=${platform_split[0]}
+              export GOARCH=${platform_split[1]}
+              [ $GOOS = "windows" ] && EXTENSION='.exe' || EXTENSION=''
+              BUILD_PATH=webrtc-piping-tunnel-$GOOS-$GOARCH
+              mkdir $BUILD_PATH
+              # Build
+              CGO_ENABLED=0 go build -o "${BUILD_PATH}/webrtc-piping-tunnel${EXTENSION}" main.go
+          done
+  operational_test:
+    runs-on: ubuntu-20.04
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - name: Run Nginx
+      run: docker run -d -p 8888:80 nginx:alpine
+    - name: Run Piping Server
+      run: docker run -d -p 8080:8080 nwtgck/piping-server:v1.12.4
+    - uses: actions/checkout@v2
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.18
+    - run: CGO_ENABLED=0 go build -o webrtc-piping-tunnel main.go
+
+    - name: TCP tunnel
+      run: |
+        set -eux
+        ./webrtc-piping-tunnel -s http://localhost:8080 8888 mypath &
+        ./webrtc-piping-tunnel -s http://localhost:8080 -l 9999 mypath &
+        sleep 1
+        curl -sS localhost:8888
+        curl -sS localhost:8888
