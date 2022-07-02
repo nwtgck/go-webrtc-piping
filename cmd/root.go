@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/nwtgck/go-webrtc-piping-tunnel/core"
+	"github.com/nwtgck/go-webrtc-piping-tunnel/version"
 	"github.com/spf13/cobra"
 	"io"
 	"log"
@@ -16,6 +17,7 @@ const (
 
 var flags struct {
 	pipingServerUrl string
+	showsVersion    bool
 	verbose         bool
 	listens         bool
 }
@@ -27,6 +29,7 @@ func init() {
 		defaultServer = "https://ppng.io"
 	}
 	RootCmd.Flags().StringVarP(&flags.pipingServerUrl, "server", "s", defaultServer, "Piping Server URL")
+	RootCmd.Flags().BoolVarP(&flags.showsVersion, "version", "V", false, "show version")
 	RootCmd.Flags().BoolVarP(&flags.verbose, "verbose", "v", false, "verbose output")
 	RootCmd.Flags().BoolVarP(&flags.listens, "listen", "l", false, "listen mode")
 }
@@ -36,6 +39,10 @@ var RootCmd = &cobra.Command{
 	Short: "webrtc-piping-tunnel",
 	Long:  "WebRTC tunnel with Piping Server WebRTC signaling",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if flags.showsVersion {
+			fmt.Println(version.Version)
+			return nil
+		}
 		if len(args) != 2 {
 			return fmt.Errorf("port and path are required")
 		}
