@@ -14,6 +14,7 @@ import (
 
 type Offer struct {
 	pipingServerUrl   string
+	httpHeaders       [][]string
 	peerConnection    *webrtc.PeerConnection
 	offerSideId       string
 	answerSideId      string
@@ -23,14 +24,15 @@ type Offer struct {
 	pendingCandidates []*webrtc.ICECandidate
 }
 
-func NewOffer(logger *log.Logger, pipingServerUrl string, peerConnection *webrtc.PeerConnection, offerSideId string, answerSideId string) *Offer {
+func NewOffer(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, peerConnection *webrtc.PeerConnection, offerSideId string, answerSideId string) *Offer {
 	return &Offer{
 		pipingServerUrl:   pipingServerUrl,
+		httpHeaders:       httpHeaders,
 		peerConnection:    peerConnection,
 		offerSideId:       offerSideId,
 		answerSideId:      answerSideId,
 		logger:            logger,
-		httpClient:        &http.Client{},
+		httpClient:        httpClient,
 		candidatesMux:     sync.Mutex{},
 		pendingCandidates: make([]*webrtc.ICECandidate, 0),
 	}
@@ -89,7 +91,7 @@ func (o *Offer) Start() error {
 	go func() {
 		// TODO: finish loop when connected
 		for {
-			candidate, err := receiveCandidate(o.httpClient, o.pipingServerUrl, o.offerSideId, o.answerSideId)
+			candidate, err := receiveCandidate(o.httpClient, o.pipingServerUrl, o.httpHeaders, o.offerSideId, o.answerSideId)
 			if err != nil {
 				errCh <- err
 				return
@@ -105,7 +107,7 @@ func (o *Offer) Start() error {
 		var sdp *webrtc.SessionDescription
 		var err error
 		for {
-			sdp, err = receiveSdp(o.logger, o.httpClient, o.pipingServerUrl, o.offerSideId, o.answerSideId)
+			sdp, err = receiveSdp(o.logger, o.httpClient, o.pipingServerUrl, o.httpHeaders, o.offerSideId, o.answerSideId)
 			if err != nil {
 				o.logger.Printf("failed to receive sdp: %+v", err)
 				time.Sleep(3 * time.Second)
@@ -133,7 +135,7 @@ func (o *Offer) Start() error {
 	}()
 
 	for {
-		if err := sendSdp(o.logger, o.httpClient, o.pipingServerUrl, o.offerSideId, o.answerSideId, &offer); err != nil {
+		if err := sendSdp(o.logger, o.httpClient, o.pipingServerUrl, o.httpHeaders, o.offerSideId, o.answerSideId, &offer); err != nil {
 			o.logger.Printf("error: %+v", err)
 			time.Sleep(3 * time.Second)
 			continue
@@ -145,5 +147,5 @@ func (o *Offer) Start() error {
 }
 
 func (o *Offer) sendCandidate(candidate *webrtc.ICECandidate) error {
-	return sendCandidate(o.logger, o.httpClient, o.pipingServerUrl, o.offerSideId, o.answerSideId, candidate)
+	return sendCandidate(o.logger, o.httpClient, o.pipingServerUrl, o.httpHeaders, o.offerSideId, o.answerSideId, candidate)
 }

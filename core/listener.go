@@ -9,11 +9,12 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"strconv"
 	"sync"
 )
 
-func Listener(logger *log.Logger, pipingServerUrl string, networkType NetworkType, port uint16, path string) error {
+func Listener(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, networkType NetworkType, port uint16, path string) error {
 	logger.Printf("listener: offer-side")
 	errCh := make(chan error)
 
@@ -78,7 +79,7 @@ func Listener(logger *log.Logger, pipingServerUrl string, networkType NetworkTyp
 	}()
 
 	go func() {
-		offer := piping_webrtc_signaling.NewOffer(logger, pipingServerUrl, peerConnection, offerSideId(path), answerSideId(path))
+		offer := piping_webrtc_signaling.NewOffer(logger, httpClient, pipingServerUrl, httpHeaders, peerConnection, offerSideId(path), answerSideId(path))
 		if err := offer.Start(); err != nil {
 			errCh <- err
 		}

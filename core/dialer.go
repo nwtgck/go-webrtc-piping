@@ -9,10 +9,11 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"strconv"
 )
 
-func Dialer(logger *log.Logger, pipingServerUrl string, networkType NetworkType, port uint16, path string) error {
+func Dialer(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, networkType NetworkType, port uint16, path string) error {
 	logger.Printf("answer-side")
 	errCh := make(chan error)
 
@@ -57,7 +58,7 @@ func Dialer(logger *log.Logger, pipingServerUrl string, networkType NetworkType,
 	}
 
 	go func() {
-		answer := piping_webrtc_signaling.NewAnswer(logger, pipingServerUrl, peerConnection, answerSideId(path), offerSideId(path))
+		answer := piping_webrtc_signaling.NewAnswer(logger, httpClient, pipingServerUrl, httpHeaders, peerConnection, answerSideId(path), offerSideId(path))
 		if err := answer.Start(); err != nil {
 			errCh <- err
 		}
