@@ -9,15 +9,23 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"strconv"
+	"sync"
 )
 
-func Listener(logger *log.Logger, pipingServerUrl string, tcpPort uint16, path string) error {
+func Listener(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, networkType NetworkType, port uint16, path string) error {
 	logger.Printf("listener: offer-side")
 	errCh := make(chan error)
 
-	// Create a new RTCPeerConnection
-	peerConnection, err := NewDetachablePeerConnection(createConfig())
+	var peerConnection *webrtc.PeerConnection
+	var err error
+	if networkType == NetworkTypeTcp {
+		peerConnection, err = NewDetachablePeerConnection(createConfig())
+	} else {
+		// NOTE: UDP does not need to detach
+		peerConnection, err = webrtc.NewPeerConnection(createConfig())
+	}
 	if err != nil {
 		return err
 	}
@@ -56,42 +64,120 @@ func Listener(logger *log.Logger, pipingServerUrl string, tcpPort uint16, path s
 	})
 
 	go func() {
-		ln, err := net.Listen("tcp", ":"+strconv.Itoa(int(tcpPort)))
-		if err != nil {
-			errCh <- err
-			return
-		}
-		for {
-			conn, err := ln.Accept()
-			if err != nil {
+		switch networkType {
+		case NetworkTypeTcp:
+			if err := tcpListener(logger, peerConnection, port); err != nil {
 				errCh <- err
 				return
 			}
-			logger.Printf("accepted")
-			dataChannel, err := peerConnection.CreateDataChannel("data", nil)
-			if err != nil {
+		case NetworkTypeUdp:
+			if err := udpListener(logger, peerConnection, port); err != nil {
 				errCh <- err
 				return
 			}
-			dataChannel.OnOpen(func() {
-				logger.Printf("OnOpen in listener")
-				raw, err := dataChannel.Detach()
-				if err != nil {
-					logger.Printf("failed to detach: %+v", err)
-					return
-				}
-				go io.Copy(raw, conn)
-				go io.Copy(conn, raw)
-			})
 		}
 	}()
 
 	go func() {
-		offer := piping_webrtc_signaling.NewOffer(logger, pipingServerUrl, peerConnection, offerSideId(path), answerSideId(path))
+		offer := piping_webrtc_signaling.NewOffer(logger, httpClient, pipingServerUrl, httpHeaders, peerConnection, offerSideId(path), answerSideId(path))
 		if err := offer.Start(); err != nil {
 			errCh <- err
 		}
 	}()
 
 	return <-errCh
+}
+
+func tcpListener(logger *log.Logger, peerConnection *webrtc.PeerConnection, port uint16) error {
+	ln, err := net.Listen("tcp", ":"+strconv.Itoa(int(port)))
+	if err != nil {
+		return err
+	}
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			return err
+		}
+		logger.Printf("accepted")
+		dataChannel, err := peerConnection.CreateDataChannel("data", nil)
+		if err != nil {
+			return err
+		}
+		dataChannel.OnOpen(func() {
+			logger.Printf("OnOpen in listener")
+			raw, err := dataChannel.Detach()
+			if err != nil {
+				logger.Printf("failed to detach: %+v", err)
+				return
+			}
+			go io.Copy(raw, conn)
+			go io.Copy(conn, raw)
+		})
+	}
+}
+
+type udpAddrToDataChannelMap struct {
+	inner *sync.Map
+}
+
+func (m udpAddrToDataChannelMap) Load(key *net.UDPAddr) *webrtc.DataChannel {
+	dataChannel, ok := m.inner.Load(key.String())
+	if !ok {
+		return nil
+	}
+	return dataChannel.(*webrtc.DataChannel)
+}
+
+func (m udpAddrToDataChannelMap) Store(key *net.UDPAddr, value *webrtc.DataChannel) {
+	m.inner.Store(key.String(), value)
+}
+
+func udpListener(logger *log.Logger, peerConnection *webrtc.PeerConnection, port uint16) error {
+	var ordered = false
+	var maxRetransmits uint16 = 0
+	dataChannelOptions := webrtc.DataChannelInit{
+		Ordered:        &ordered,
+		MaxRetransmits: &maxRetransmits,
+	}
+	raddrToDataChannel := udpAddrToDataChannelMap{inner: new(sync.Map)}
+
+	laddr, err := net.ResolveUDPAddr("udp", ":"+strconv.Itoa(int(port)))
+	if err != nil {
+		return err
+	}
+	conn, err := net.ListenUDP("udp", laddr)
+	if err != nil {
+		return err
+	}
+	var buf [65536]byte
+	for {
+		n, raddr, err := conn.ReadFromUDP(buf[:])
+		if err != nil {
+			return err
+		}
+		dataChannel := raddrToDataChannel.Load(raddr)
+		if dataChannel == nil {
+			dataChannel, err = peerConnection.CreateDataChannel("data", &dataChannelOptions)
+			if err != nil {
+				return err
+			}
+
+			dataChannel.OnMessage(func(msg webrtc.DataChannelMessage) {
+				if _, err := conn.WriteToUDP(msg.Data, raddr); err != nil {
+					logger.Printf("failed to write to UDP: %+v", err)
+				}
+			})
+
+			openedCh := make(chan struct{})
+			dataChannel.OnOpen(func() {
+				raddrToDataChannel.Store(raddr, dataChannel)
+				openedCh <- struct{}{}
+			})
+			<-openedCh
+
+		}
+		if err := dataChannel.Send(buf[:n]); err != nil {
+			return err
+		}
+	}
 }

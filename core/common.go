@@ -5,6 +5,13 @@ import (
 	"github.com/pion/webrtc/v3"
 )
 
+type NetworkType int64
+
+const (
+	NetworkTypeTcp NetworkType = iota
+	NetworkTypeUdp
+)
+
 func createConfig() webrtc.Configuration {
 	return webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
