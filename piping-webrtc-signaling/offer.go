@@ -76,6 +76,10 @@ func (o *Offer) Start() error {
 		if err != nil {
 			goto retry
 		}
+		if res.StatusCode != 200 {
+			err = fmt.Errorf("initial status=%d", res.StatusCode)
+			goto retry
+		}
 		if _, err = io.Copy(io.Discard, res.Body); err != nil {
 			goto retry
 		}

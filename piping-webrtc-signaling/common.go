@@ -33,6 +33,9 @@ func sendSdp(logger *log.Logger, httpClient *http.Client, pipingServerUrl string
 	if err != nil {
 		return err
 	}
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("sendSdp status=%d", resp.StatusCode)
+	}
 	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
 		return err
 	}
@@ -55,6 +58,9 @@ func receiveSdp(logger *log.Logger, httpClient *http.Client, pipingServerUrl str
 	r, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
+	}
+	if r.StatusCode != 200 {
+		return nil, fmt.Errorf("receiveSdp status=%d", r.StatusCode)
 	}
 	sdp := webrtc.SessionDescription{}
 	if err := json.NewDecoder(r.Body).Decode(&sdp); err != nil {
@@ -81,6 +87,9 @@ func sendCandidate(logger *log.Logger, httpClient *http.Client, pipingServerUrl 
 	if err != nil {
 		return err
 	}
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("receiveSdp status=%d", resp.StatusCode)
+	}
 	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
 		return err
 	}
@@ -101,6 +110,9 @@ func receiveCandidate(httpClient *http.Client, pipingServerUrl string, httpHeade
 	res, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
+	}
+	if res.StatusCode != 200 {
+		return nil, fmt.Errorf("receiveCandidate status=%d", res.StatusCode)
 	}
 	candidateBytes, err := io.ReadAll(res.Body)
 	if err != nil {

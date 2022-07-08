@@ -61,6 +61,10 @@ func (a *Answer) Start() error {
 		if err != nil {
 			goto retry
 		}
+		if res.StatusCode != 200 {
+			err = fmt.Errorf("initial status=%d", res.StatusCode)
+			goto retry
+		}
 		if err = json.NewDecoder(res.Body).Decode(&initial); err != nil {
 			goto retry
 		}
