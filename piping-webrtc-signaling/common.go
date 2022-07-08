@@ -69,13 +69,21 @@ func receiveSdp(logger *log.Logger, httpClient *http.Client, pipingServerUrl str
 	return &sdp, nil
 }
 
-func sendCandidate(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, localId string, remoteId string, c *webrtc.ICECandidate) error {
-	candidateBytes, err := json.Marshal(c.ToJSON())
+func sendCandidates(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, localId string, remoteId string, cs []*webrtc.ICECandidate) error {
+	var candidateJsons []webrtc.ICECandidateInit
+	for _, c := range cs {
+		candidateJsons = append(candidateJsons, c.ToJSON())
+	}
+	candidateBytes, err := json.Marshal(&candidateJsons)
 	if err != nil {
 		return err
 	}
-	logger.Printf("sending candidate...")
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/%s-%s/candidate", pipingServerUrl, localId, remoteId), bytes.NewReader(candidateBytes))
+	if len(cs) == 0 {
+		// https://github.com/golang/go/issues/31811
+		candidateBytes = []byte("[]")
+	}
+	logger.Printf("sending candidates...")
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/%s-%s/candidates", pipingServerUrl, localId, remoteId), bytes.NewReader(candidateBytes))
 	if err != nil {
 		return err
 	}
@@ -99,8 +107,8 @@ func sendCandidate(logger *log.Logger, httpClient *http.Client, pipingServerUrl 
 	return nil
 }
 
-func receiveCandidate(httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, localId string, remoteId string) (*webrtc.ICECandidateInit, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/%s-%s/candidate", pipingServerUrl, remoteId, localId), nil)
+func receiveCandidates(httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, localId string, remoteId string) ([]webrtc.ICECandidateInit, error) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/%s-%s/candidates", pipingServerUrl, remoteId, localId), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +120,7 @@ func receiveCandidate(httpClient *http.Client, pipingServerUrl string, httpHeade
 		return nil, err
 	}
 	if res.StatusCode != 200 {
-		return nil, fmt.Errorf("receiveCandidate status=%d", res.StatusCode)
+		return nil, fmt.Errorf("receiveCandidates status=%d", res.StatusCode)
 	}
 	candidateBytes, err := io.ReadAll(res.Body)
 	if err != nil {
@@ -121,9 +129,9 @@ func receiveCandidate(httpClient *http.Client, pipingServerUrl string, httpHeade
 	if err := res.Body.Close(); err != nil {
 		return nil, err
 	}
-	var candidate webrtc.ICECandidateInit
-	if err := json.Unmarshal(candidateBytes, &candidate); err != nil {
+	var candidates []webrtc.ICECandidateInit
+	if err := json.Unmarshal(candidateBytes, &candidates); err != nil {
 		return nil, err
 	}
-	return &candidate, nil
+	return candidates, nil
 }
