@@ -68,7 +68,7 @@ func (a *Answer) Start() error {
 
 	var initial InitialJson
 	for {
-		res, err := a.httpClient.Get(fmt.Sprintf("%s/%s-%s", a.pipingServerUrl, a.offerSideId, a.answerSideId))
+		res, err := a.httpClient.Get(fmt.Sprintf("%s/%s", a.pipingServerUrl, sha256String(fmt.Sprintf("%s-%s", a.offerSideId, a.answerSideId))))
 		if err != nil {
 			goto retry
 		}

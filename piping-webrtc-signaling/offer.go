@@ -84,7 +84,7 @@ func (o *Offer) Start() error {
 		return err
 	}
 	for {
-		res, err := o.httpClient.Post(fmt.Sprintf("%s/%s-%s", o.pipingServerUrl, o.offerSideId, o.answerSideId), "application/json; charset=utf-8", bytes.NewReader(initialBytes))
+		res, err := o.httpClient.Post(fmt.Sprintf("%s/%s", o.pipingServerUrl, sha256String(fmt.Sprintf("%s-%s", o.offerSideId, o.answerSideId))), "application/json; charset=utf-8", bytes.NewReader(initialBytes))
 		if err != nil {
 			goto retry
 		}

@@ -2,6 +2,7 @@ package piping_webrtc_signaling
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"github.com/pion/webrtc/v3"
@@ -12,6 +13,11 @@ import (
 
 type InitialJson struct {
 	Version uint64 `json:"version"`
+}
+
+func sha256String(s string) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(s)))
+
 }
 
 func sendSdp(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, localId string, remoteId string, description *webrtc.SessionDescription) error {
