@@ -8,12 +8,13 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 )
 
 type Offer struct {
-	pipingServerUrl string
+	pipingServerUrl *url.URL
 	httpHeaders     [][]string
 	peerConnection  *webrtc.PeerConnection
 	offerSideId     string
@@ -22,7 +23,11 @@ type Offer struct {
 	httpClient      *http.Client
 }
 
-func NewOffer(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, peerConnection *webrtc.PeerConnection, offerSideId string, answerSideId string) *Offer {
+func NewOffer(logger *log.Logger, httpClient *http.Client, pipingServerUrlStr string, httpHeaders [][]string, peerConnection *webrtc.PeerConnection, offerSideId string, answerSideId string) (*Offer, error) {
+	pipingServerUrl, err := url.Parse(pipingServerUrlStr)
+	if err != nil {
+		return nil, err
+	}
 	return &Offer{
 		pipingServerUrl: pipingServerUrl,
 		httpHeaders:     httpHeaders,
@@ -31,7 +36,7 @@ func NewOffer(logger *log.Logger, httpClient *http.Client, pipingServerUrl strin
 		answerSideId:    answerSideId,
 		logger:          logger,
 		httpClient:      httpClient,
-	}
+	}, nil
 }
 
 func (o *Offer) Start() error {
@@ -84,7 +89,7 @@ func (o *Offer) Start() error {
 		return err
 	}
 	for {
-		res, err := o.httpClient.Post(fmt.Sprintf("%s/%s", o.pipingServerUrl, sha256String(fmt.Sprintf("%s-%s", o.offerSideId, o.answerSideId))), "application/json; charset=utf-8", bytes.NewReader(initialBytes))
+		res, err := o.httpClient.Post(urlJoin(o.pipingServerUrl, sha256String(fmt.Sprintf("%s-%s", o.offerSideId, o.answerSideId))), "application/json; charset=utf-8", bytes.NewReader(initialBytes))
 		if err != nil {
 			goto retry
 		}

@@ -6,12 +6,13 @@ import (
 	"github.com/pion/webrtc/v3"
 	"log"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 )
 
 type Answer struct {
-	pipingServerUrl string
+	pipingServerUrl *url.URL
 	httpHeaders     [][]string
 	peerConnection  *webrtc.PeerConnection
 	answerSideId    string
@@ -20,7 +21,11 @@ type Answer struct {
 	httpClient      *http.Client
 }
 
-func NewAnswer(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, peerConnection *webrtc.PeerConnection, answerSideId string, offerSideId string) *Answer {
+func NewAnswer(logger *log.Logger, httpClient *http.Client, pipingServerUrlStr string, httpHeaders [][]string, peerConnection *webrtc.PeerConnection, answerSideId string, offerSideId string) (*Answer, error) {
+	pipingServerUrl, err := url.Parse(pipingServerUrlStr)
+	if err != nil {
+		return nil, err
+	}
 	return &Answer{
 		pipingServerUrl: pipingServerUrl,
 		httpHeaders:     httpHeaders,
@@ -29,7 +34,7 @@ func NewAnswer(logger *log.Logger, httpClient *http.Client, pipingServerUrl stri
 		offerSideId:     offerSideId,
 		logger:          logger,
 		httpClient:      httpClient,
-	}
+	}, nil
 }
 
 func (a *Answer) Start() error {
@@ -68,7 +73,7 @@ func (a *Answer) Start() error {
 
 	var initial InitialJson
 	for {
-		res, err := a.httpClient.Get(fmt.Sprintf("%s/%s", a.pipingServerUrl, sha256String(fmt.Sprintf("%s-%s", a.offerSideId, a.answerSideId))))
+		res, err := a.httpClient.Get(urlJoin(a.pipingServerUrl, sha256String(fmt.Sprintf("%s-%s", a.offerSideId, a.answerSideId))))
 		if err != nil {
 			goto retry
 		}

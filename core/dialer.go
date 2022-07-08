@@ -58,7 +58,11 @@ func Dialer(logger *log.Logger, httpClient *http.Client, pipingServerUrl string,
 	}
 
 	go func() {
-		answer := piping_webrtc_signaling.NewAnswer(logger, httpClient, pipingServerUrl, httpHeaders, peerConnection, answerSideId(path), offerSideId(path))
+		answer, err := piping_webrtc_signaling.NewAnswer(logger, httpClient, pipingServerUrl, httpHeaders, peerConnection, answerSideId(path), offerSideId(path))
+		if err != nil {
+			errCh <- err
+			return
+		}
 		if err := answer.Start(); err != nil {
 			errCh <- err
 		}

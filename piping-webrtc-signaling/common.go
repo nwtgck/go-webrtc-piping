@@ -9,6 +9,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
+	"path"
 )
 
 type InitialJson struct {
@@ -17,15 +19,21 @@ type InitialJson struct {
 
 func sha256String(s string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(s)))
-
 }
 
-func sendSdp(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, localId string, remoteId string, description *webrtc.SessionDescription) error {
+// (base: https://stackoverflow.com/a/34668130/2885946)
+func urlJoin(u *url.URL, p ...string) string {
+	uCloned := *u
+	uCloned.Path = path.Join(append([]string{uCloned.Path}, p...)...)
+	return uCloned.String()
+}
+
+func sendSdp(logger *log.Logger, httpClient *http.Client, pipingServerUrl *url.URL, httpHeaders [][]string, localId string, remoteId string, description *webrtc.SessionDescription) error {
 	payload, err := json.Marshal(description)
 	if err != nil {
 		return err
 	}
-	url := fmt.Sprintf("%s/%s-%s/sdp", pipingServerUrl, localId, remoteId)
+	url := urlJoin(pipingServerUrl, fmt.Sprintf("%s-%s/sdp", localId, remoteId))
 	logger.Printf("sending sdp to %s...", url)
 	req, err := http.NewRequest("POST", url, bytes.NewReader(payload))
 	if err != nil {
@@ -51,8 +59,8 @@ func sendSdp(logger *log.Logger, httpClient *http.Client, pipingServerUrl string
 	return nil
 }
 
-func receiveSdp(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, localId string, remoteId string) (*webrtc.SessionDescription, error) {
-	url := fmt.Sprintf("%s/%s-%s/sdp", pipingServerUrl, remoteId, localId)
+func receiveSdp(logger *log.Logger, httpClient *http.Client, pipingServerUrl *url.URL, httpHeaders [][]string, localId string, remoteId string) (*webrtc.SessionDescription, error) {
+	url := urlJoin(pipingServerUrl, fmt.Sprintf("%s-%s/sdp", remoteId, localId))
 	logger.Printf("receiving sdp from %s ...", url)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -75,7 +83,7 @@ func receiveSdp(logger *log.Logger, httpClient *http.Client, pipingServerUrl str
 	return &sdp, nil
 }
 
-func sendCandidates(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, localId string, remoteId string, cs []*webrtc.ICECandidate) error {
+func sendCandidates(logger *log.Logger, httpClient *http.Client, pipingServerUrl *url.URL, httpHeaders [][]string, localId string, remoteId string, cs []*webrtc.ICECandidate) error {
 	var candidateJsons []webrtc.ICECandidateInit
 	for _, c := range cs {
 		candidateJsons = append(candidateJsons, c.ToJSON())
@@ -89,7 +97,7 @@ func sendCandidates(logger *log.Logger, httpClient *http.Client, pipingServerUrl
 		candidateBytes = []byte("[]")
 	}
 	logger.Printf("sending candidates...")
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/%s-%s/candidates", pipingServerUrl, localId, remoteId), bytes.NewReader(candidateBytes))
+	req, err := http.NewRequest("POST", urlJoin(pipingServerUrl, fmt.Sprintf("%s-%s/candidates", localId, remoteId)), bytes.NewReader(candidateBytes))
 	if err != nil {
 		return err
 	}
@@ -113,8 +121,8 @@ func sendCandidates(logger *log.Logger, httpClient *http.Client, pipingServerUrl
 	return nil
 }
 
-func receiveCandidates(httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, localId string, remoteId string) ([]webrtc.ICECandidateInit, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/%s-%s/candidates", pipingServerUrl, remoteId, localId), nil)
+func receiveCandidates(httpClient *http.Client, pipingServerUrl *url.URL, httpHeaders [][]string, localId string, remoteId string) ([]webrtc.ICECandidateInit, error) {
+	req, err := http.NewRequest("GET", urlJoin(pipingServerUrl, fmt.Sprintf("%s-%s/candidates", remoteId, localId)), nil)
 	if err != nil {
 		return nil, err
 	}

@@ -79,7 +79,11 @@ func Listener(logger *log.Logger, httpClient *http.Client, pipingServerUrl strin
 	}()
 
 	go func() {
-		offer := piping_webrtc_signaling.NewOffer(logger, httpClient, pipingServerUrl, httpHeaders, peerConnection, offerSideId(path), answerSideId(path))
+		offer, err := piping_webrtc_signaling.NewOffer(logger, httpClient, pipingServerUrl, httpHeaders, peerConnection, offerSideId(path), answerSideId(path))
+		if err != nil {
+			errCh <- err
+			return
+		}
 		if err := offer.Start(); err != nil {
 			errCh <- err
 		}
