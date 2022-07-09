@@ -71,25 +71,41 @@ func (a *Answer) Start() error {
 		}
 	})
 
-	var initial InitialJson
+	var offerInitial OfferInitialJson
 	for {
-		res, err := a.httpClient.Get(urlJoin(a.pipingServerUrl, sha256String(fmt.Sprintf("%s-%s", a.offerSideId, a.answerSideId))))
+		err := func() error {
+			offerInitialBytes, err := httpGetWithHeaders(a.httpClient, urlJoin(a.pipingServerUrl, sha256String(fmt.Sprintf("%s-%s", a.offerSideId, a.answerSideId))), a.httpHeaders)
+			if err != nil {
+				return err
+			}
+			if err = json.Unmarshal(offerInitialBytes, &offerInitial); err != nil {
+				return err
+			}
+			return nil
+		}()
 		if err != nil {
-			goto retry
-		}
-		if res.StatusCode != 200 {
-			err = fmt.Errorf("initial status=%d", res.StatusCode)
-			goto retry
-		}
-		if err = json.NewDecoder(res.Body).Decode(&initial); err != nil {
-			goto retry
+			a.logger.Printf("error: %+v", err)
+			time.Sleep(3 * time.Second)
+			continue
 		}
 		break
-	retry:
-		a.logger.Printf("error: %+v", err)
-		time.Sleep(3 * time.Second)
 	}
-	a.logger.Printf("initial: %+v", initial)
+	a.logger.Printf("offerInitial: %+v", offerInitial)
+
+	answerInitial := AnswerInitialJson{Version: 1}
+	answerInitialBytes, err := json.Marshal(answerInitial)
+	if err != nil {
+		return err
+	}
+	for {
+		err := pipingPostJson(a.httpClient, urlJoin(a.pipingServerUrl, sha256String(fmt.Sprintf("%s-%s", a.answerSideId, a.offerSideId))), a.httpHeaders, answerInitialBytes)
+		if err != nil {
+			a.logger.Printf("failed to send answerInitial: %+v", err)
+			time.Sleep(3 * time.Second)
+			continue
+		}
+		break
+	}
 
 	go func() {
 		for {

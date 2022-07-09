@@ -13,7 +13,11 @@ import (
 	"path"
 )
 
-type InitialJson struct {
+type OfferInitialJson struct {
+	Version uint64 `json:"version"`
+}
+
+type AnswerInitialJson struct {
 	Version uint64 `json:"version"`
 }
 
@@ -28,40 +32,7 @@ func urlJoin(u *url.URL, p ...string) string {
 	return uCloned.String()
 }
 
-func sendSdp(logger *log.Logger, httpClient *http.Client, pipingServerUrl *url.URL, httpHeaders [][]string, localId string, remoteId string, description *webrtc.SessionDescription) error {
-	payload, err := json.Marshal(description)
-	if err != nil {
-		return err
-	}
-	url := urlJoin(pipingServerUrl, fmt.Sprintf("%s-%s/sdp", localId, remoteId))
-	logger.Printf("sending sdp to %s...", url)
-	req, err := http.NewRequest("POST", url, bytes.NewReader(payload))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-	for _, kv := range httpHeaders {
-		req.Header.Add(kv[0], kv[1])
-	}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("sendSdp status=%d", resp.StatusCode)
-	}
-	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
-		return err
-	}
-	if err := resp.Body.Close(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func receiveSdp(logger *log.Logger, httpClient *http.Client, pipingServerUrl *url.URL, httpHeaders [][]string, localId string, remoteId string) (*webrtc.SessionDescription, error) {
-	url := urlJoin(pipingServerUrl, fmt.Sprintf("%s-%s/sdp", remoteId, localId))
-	logger.Printf("receiving sdp from %s ...", url)
+func httpGetWithHeaders(httpClient *http.Client, url string, httpHeaders [][]string) ([]byte, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -69,15 +40,67 @@ func receiveSdp(logger *log.Logger, httpClient *http.Client, pipingServerUrl *ur
 	for _, kv := range httpHeaders {
 		req.Header.Add(kv[0], kv[1])
 	}
-	r, err := httpClient.Do(req)
+	res, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	if r.StatusCode != 200 {
-		return nil, fmt.Errorf("receiveSdp status=%d", r.StatusCode)
+	if res.StatusCode != 200 {
+		return nil, fmt.Errorf("status=%d", res.StatusCode)
+	}
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+	if err := res.Body.Close(); err != nil {
+		return nil, err
+	}
+	return bodyBytes, nil
+}
+
+func pipingPostJson(httpClient *http.Client, url string, httpHeaders [][]string, jsonBytes []byte) error {
+	req, err := http.NewRequest("POST", url, bytes.NewReader(jsonBytes))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	for _, kv := range httpHeaders {
+		req.Header.Add(kv[0], kv[1])
+	}
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	if res.StatusCode != 200 {
+		return fmt.Errorf("status=%d", res.StatusCode)
+	}
+	if _, err := io.Copy(io.Discard, res.Body); err != nil {
+		return err
+	}
+	if err := res.Body.Close(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func sendSdp(logger *log.Logger, httpClient *http.Client, pipingServerUrl *url.URL, httpHeaders [][]string, localId string, remoteId string, description *webrtc.SessionDescription) error {
+	jsonBytes, err := json.Marshal(description)
+	if err != nil {
+		return err
+	}
+	url := urlJoin(pipingServerUrl, fmt.Sprintf("%s-%s/sdp", localId, remoteId))
+	logger.Printf("sending sdp to %s...", url)
+	return pipingPostJson(httpClient, url, httpHeaders, jsonBytes)
+}
+
+func receiveSdp(logger *log.Logger, httpClient *http.Client, pipingServerUrl *url.URL, httpHeaders [][]string, localId string, remoteId string) (*webrtc.SessionDescription, error) {
+	url := urlJoin(pipingServerUrl, fmt.Sprintf("%s-%s/sdp", remoteId, localId))
+	logger.Printf("receiving sdp from %s ...", url)
+	sdpBytes, err := httpGetWithHeaders(httpClient, url, httpHeaders)
+	if err != nil {
+		return nil, err
 	}
 	sdp := webrtc.SessionDescription{}
-	if err := json.NewDecoder(r.Body).Decode(&sdp); err != nil {
+	if err := json.Unmarshal(sdpBytes, &sdp); err != nil {
 		return nil, err
 	}
 	return &sdp, nil
@@ -97,50 +120,12 @@ func sendCandidates(logger *log.Logger, httpClient *http.Client, pipingServerUrl
 		candidateBytes = []byte("[]")
 	}
 	logger.Printf("sending candidates...")
-	req, err := http.NewRequest("POST", urlJoin(pipingServerUrl, fmt.Sprintf("%s-%s/candidates", localId, remoteId)), bytes.NewReader(candidateBytes))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-	for _, kv := range httpHeaders {
-		req.Header.Add(kv[0], kv[1])
-	}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("receiveSdp status=%d", resp.StatusCode)
-	}
-	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
-		return err
-	}
-	if err := resp.Body.Close(); err != nil {
-		return err
-	}
-	return nil
+	return pipingPostJson(httpClient, urlJoin(pipingServerUrl, fmt.Sprintf("%s-%s/candidates", localId, remoteId)), httpHeaders, candidateBytes)
 }
 
 func receiveCandidates(httpClient *http.Client, pipingServerUrl *url.URL, httpHeaders [][]string, localId string, remoteId string) ([]webrtc.ICECandidateInit, error) {
-	req, err := http.NewRequest("GET", urlJoin(pipingServerUrl, fmt.Sprintf("%s-%s/candidates", remoteId, localId)), nil)
+	candidateBytes, err := httpGetWithHeaders(httpClient, urlJoin(pipingServerUrl, fmt.Sprintf("%s-%s/candidates", remoteId, localId)), httpHeaders)
 	if err != nil {
-		return nil, err
-	}
-	for _, kv := range httpHeaders {
-		req.Header.Add(kv[0], kv[1])
-	}
-	res, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	if res.StatusCode != 200 {
-		return nil, fmt.Errorf("receiveCandidates status=%d", res.StatusCode)
-	}
-	candidateBytes, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
-	if err := res.Body.Close(); err != nil {
 		return nil, err
 	}
 	var candidates []webrtc.ICECandidateInit

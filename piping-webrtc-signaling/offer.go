@@ -1,11 +1,9 @@
 package piping_webrtc_signaling
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/pion/webrtc/v3"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -83,30 +81,42 @@ func (o *Offer) Start() error {
 		return err
 	}
 
-	initial := InitialJson{Version: 1}
-	initialBytes, err := json.Marshal(initial)
+	offerInitial := OfferInitialJson{Version: 1}
+	offerInitialBytes, err := json.Marshal(offerInitial)
 	if err != nil {
 		return err
 	}
 	for {
-		res, err := o.httpClient.Post(urlJoin(o.pipingServerUrl, sha256String(fmt.Sprintf("%s-%s", o.offerSideId, o.answerSideId))), "application/json; charset=utf-8", bytes.NewReader(initialBytes))
+		err := pipingPostJson(o.httpClient, urlJoin(o.pipingServerUrl, sha256String(fmt.Sprintf("%s-%s", o.offerSideId, o.answerSideId))), o.httpHeaders, offerInitialBytes)
 		if err != nil {
-			goto retry
-		}
-		if res.StatusCode != 200 {
-			err = fmt.Errorf("initial status=%d", res.StatusCode)
-			goto retry
-		}
-		if _, err = io.Copy(io.Discard, res.Body); err != nil {
-			goto retry
-		}
-		if err = res.Body.Close(); err != nil {
-			goto retry
+			o.logger.Printf("failed to send offerInitial: %+v", err)
+			time.Sleep(3 * time.Second)
+			continue
 		}
 		break
-	retry:
-		time.Sleep(3 * time.Second)
-		continue
+	}
+	var answerInitial AnswerInitialJson
+	for {
+		err := func() error {
+			answerInitialBytes, err := httpGetWithHeaders(o.httpClient, urlJoin(o.pipingServerUrl, sha256String(fmt.Sprintf("%s-%s", o.answerSideId, o.offerSideId))), o.httpHeaders)
+			if err != nil {
+				return err
+			}
+			if err = json.Unmarshal(answerInitialBytes, &answerInitial); err != nil {
+				return err
+			}
+			return nil
+		}()
+		if err != nil {
+			o.logger.Printf("error: %+v", err)
+			time.Sleep(3 * time.Second)
+			continue
+		}
+		break
+	}
+	o.logger.Printf("answerInitial: %+v", answerInitial)
+	if answerInitial.Version > 1 {
+		return fmt.Errorf("unsupported answer-side version: %d", answerInitial.Version)
 	}
 
 	go func() {
