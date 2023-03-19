@@ -12,7 +12,7 @@ import (
 	"os"
 )
 
-func HandleAnswer(logger *log.Logger, pipingServerUrl string, localId string, remoteId string, webrtcConfig webrtc.Configuration) error {
+func HandleAnswer(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, localId string, remoteId string, webrtcConfig webrtc.Configuration) error {
 	logger.Printf("answer-side")
 	errCh := make(chan error)
 
@@ -61,8 +61,6 @@ func HandleAnswer(logger *log.Logger, pipingServerUrl string, localId string, re
 	})
 
 	go func() {
-		httpClient := &http.Client{}
-		httpHeaders := [][]string{}
 		answer, err := piping_webrtc_signaling.NewAnswer(logger, httpClient, pipingServerUrl, httpHeaders, peerConnection, localId, remoteId)
 		if err != nil {
 			errCh <- err

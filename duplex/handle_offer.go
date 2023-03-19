@@ -12,7 +12,7 @@ import (
 	"os"
 )
 
-func HandleOffer(logger *log.Logger, pipingServerUrl string, localId string, remoteId string, webrtcConfig webrtc.Configuration) error {
+func HandleOffer(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, localId string, remoteId string, webrtcConfig webrtc.Configuration) error {
 	logger.Printf("offer-side")
 	errCh := make(chan error)
 
@@ -64,8 +64,6 @@ func HandleOffer(logger *log.Logger, pipingServerUrl string, localId string, rem
 	})
 
 	go func() {
-		httpClient := &http.Client{}
-		httpHeaders := [][]string{}
 		offer, err := piping_webrtc_signaling.NewOffer(logger, httpClient, pipingServerUrl, httpHeaders, peerConnection, localId, remoteId)
 		if err != nil {
 			errCh <- err

@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"io"
 	"log"
+	"net/http"
 	"os"
 )
 
@@ -30,11 +31,19 @@ var DuplexCmd = &cobra.Command{
 		} else {
 			logger = log.New(io.Discard, "", 0)
 		}
+		httpClient := createHttpClient(flags.insecure)
+		if flags.dnsServer != "" {
+			httpClient.Transport.(*http.Transport).DialContext = createDialContext(flags.dnsServer)
+		}
+		httpHeaders, err := parseHeaderKeyValueStrs(flags.httpHeaderKeyValueStrs)
+		if err != nil {
+			return err
+		}
 		webrtcConfig := createWebrtcConfig()
 		if localId < remoteId {
-			return duplex.HandleOffer(logger, flags.pipingServerUrl, localId, remoteId, webrtcConfig)
+			return duplex.HandleOffer(logger, httpClient, flags.pipingServerUrl, httpHeaders, localId, remoteId, webrtcConfig)
 		} else {
-			return duplex.HandleAnswer(logger, flags.pipingServerUrl, localId, remoteId, webrtcConfig)
+			return duplex.HandleAnswer(logger, httpClient, flags.pipingServerUrl, httpHeaders, localId, remoteId, webrtcConfig)
 		}
 	},
 }
