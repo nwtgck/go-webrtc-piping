@@ -1,4 +1,4 @@
-project_name: webrtc-piping-tunnel
+project_name: webrtc-piping
 builds:
   - env:
       - CGO_ENABLED=0
@@ -28,7 +28,7 @@ archives:
 nfpms:
   - license: MIT
     maintainer: Ryo Ota <nwtgck@nwtgck.org>
-    homepage: https://github.com/nwtgck/go-webrtc-piping-tunnel
+    homepage: https://github.com/nwtgck/go-webrtc-piping
     description: "WebRTC tunnel with Piping Server WebRTC signaling"
     formats:
       - rpm
@@ -44,6 +44,6 @@ release:
 brews:
   - tap:
       owner: nwtgck
-      name: homebrew-webrtc-piping-tunnel
-    homepage: "https://github.com/nwtgck/go-webrtc-piping-tunnel"
+      name: homebrew-webrtc-piping
+    homepage: "https://github.com/nwtgck/go-webrtc-piping"
     description: "WebRTC tunnel with Piping Server WebRTC signaling"
