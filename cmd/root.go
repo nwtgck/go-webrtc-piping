@@ -32,13 +32,13 @@ func init() {
 	if !ok {
 		defaultServer = "https://ppng.io"
 	}
-	RootCmd.Flags().StringVarP(&flags.pipingServerUrl, "server", "s", defaultServer, "Piping Server URL")
+	RootCmd.PersistentFlags().StringVarP(&flags.pipingServerUrl, "server", "s", defaultServer, "Piping Server URL")
 	RootCmd.PersistentFlags().StringVar(&flags.dnsServer, "dns-server", "", "DNS server (e.g. 1.1.1.1:53)")
 	// --insecure, -k is inspired by curl
 	RootCmd.PersistentFlags().BoolVarP(&flags.insecure, "insecure", "k", false, "Allow insecure server connections when using SSL")
 	RootCmd.PersistentFlags().StringArrayVarP(&flags.httpHeaderKeyValueStrs, "header", "H", []string{}, "HTTP header")
-	RootCmd.Flags().BoolVarP(&flags.showsVersion, "version", "V", false, "show version")
-	RootCmd.Flags().BoolVarP(&flags.verbose, "verbose", "v", false, "verbose output")
+	RootCmd.PersistentFlags().BoolVarP(&flags.showsVersion, "version", "V", false, "show version")
+	RootCmd.PersistentFlags().BoolVarP(&flags.verbose, "verbose", "v", false, "verbose output")
 }
 
 var RootCmd = &cobra.Command{
