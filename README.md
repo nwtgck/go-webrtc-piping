@@ -1,5 +1,23 @@
 # go-webrtc-piping
-WebRTC P2P tunneling/duplex with Piping Server WebRTC signaling
+[![CI](https://github.com/nwtgck/go-webrtc-piping/actions/workflows/ci.yml/badge.svg)](https://github.com/nwtgck/go-webrtc-piping/actions/workflows/ci.yml)
+
+WebRTC P2P tunneling/duplex with [Piping Server](https://github.com/nwtgck/piping-server) WebRTC signaling
+
+## Install for Windows
+[Download](https://github.com/nwtgck/go-webrtc-piping/releases/download/v0.3.0/webrtc-piping-0.3.0-windows-amd64.zip)
+
+## Install for macOS
+```bash
+brew install nwtgck/webrtc-piping/webrtc-piping
+```
+
+## Install for Ubuntu
+```bash
+wget https://github.com/nwtgck/go-webrtc-piping/releases/download/v0.3.0/webrtc-piping-0.3.0-linux-amd64.deb
+sudo dpkg -i webrtc-piping-0.3.0-linux-amd64.deb 
+```
+
+Get more executables in the [releases](https://github.com/nwtgck/go-webrtc-piping/releases).
 
 ## TCP tunneling
 
