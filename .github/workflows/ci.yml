@@ -31,6 +31,7 @@ jobs:
           done
   operational_test:
     runs-on: ubuntu-20.04
+    timeout-minutes: 1
     defaults:
       run:
         shell: bash
@@ -40,8 +41,7 @@ jobs:
     - name: Run Piping Server
       run: docker run -d -p 8080:8080 nwtgck/piping-server:v1.12.4
     - uses: actions/checkout@v3
-    - name: Set up Go 1.x
-      uses: actions/setup-go@v4
+    - uses: actions/setup-go@v4
       with:
         go-version: 1.19
     - run: CGO_ENABLED=0 go build -o webrtc-piping main.go
@@ -52,8 +52,8 @@ jobs:
         ./webrtc-piping -s http://localhost:8080 tunnel 8888 mypath &
         ./webrtc-piping -s http://localhost:8080 tunnel -l 9999 mypath &
         sleep 1
-        curl -fsS localhost:8888
-        curl -fsS localhost:8888
+        curl -fsS localhost:9999
+        curl -fsS localhost:9999
         
     - name: Duplex communication
       run: |
