@@ -88,7 +88,7 @@ func sendSdp(logger *log.Logger, httpClient *http.Client, pipingServerUrl *url.U
 		return err
 	}
 	url := urlJoin(pipingServerUrl, fmt.Sprintf("%s-%s/sdp", localId, remoteId))
-	logger.Printf("sending sdp to %s...", url)
+	logger.Printf("sending sdp %s to %s...", string(jsonBytes), url)
 	return pipingPostJson(httpClient, url, httpHeaders, jsonBytes)
 }
 
@@ -119,7 +119,7 @@ func sendCandidates(logger *log.Logger, httpClient *http.Client, pipingServerUrl
 		// https://github.com/golang/go/issues/31811
 		candidateBytes = []byte("[]")
 	}
-	logger.Printf("sending candidates...")
+	logger.Printf("sending candidates %s...", string(candidateBytes))
 	return pipingPostJson(httpClient, urlJoin(pipingServerUrl, fmt.Sprintf("%s-%s/candidates", localId, remoteId)), httpHeaders, candidateBytes)
 }
 
