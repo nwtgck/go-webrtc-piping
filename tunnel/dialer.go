@@ -1,6 +1,6 @@
 // base: https://github.com/pion/webrtc/tree/80e5cdda5687d696556f2f2605a4c83f61ac3a08/examples/pion-to-pion
 
-package core
+package tunnel
 
 import (
 	"fmt"

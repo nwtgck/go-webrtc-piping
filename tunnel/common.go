@@ -1,4 +1,4 @@
-package core
+package tunnel
 
 import (
 	"github.com/pion/interceptor"

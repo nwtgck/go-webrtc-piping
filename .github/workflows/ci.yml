@@ -49,8 +49,8 @@ jobs:
     - name: TCP tunnel
       run: |
         set -eux
-        ./webrtc-piping -s http://localhost:8080 8888 mypath &
-        ./webrtc-piping -s http://localhost:8080 -l 9999 mypath &
+        ./webrtc-piping tunnel -s http://localhost:8080 8888 mypath &
+        ./webrtc-piping tunnel -s http://localhost:8080 -l 9999 mypath &
         sleep 1
         curl -sS localhost:8888
         curl -sS localhost:8888

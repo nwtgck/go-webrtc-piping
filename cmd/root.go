@@ -4,15 +4,11 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/nwtgck/go-webrtc-piping/core"
 	"github.com/nwtgck/go-webrtc-piping/version"
 	"github.com/spf13/cobra"
-	"io"
-	"log"
 	"net"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -28,8 +24,6 @@ var flags struct {
 	httpHeaderKeyValueStrs []string
 	showsVersion           bool
 	verbose                bool
-	listens                bool
-	usesUdp                bool
 }
 
 func init() {
@@ -45,8 +39,6 @@ func init() {
 	RootCmd.PersistentFlags().StringArrayVarP(&flags.httpHeaderKeyValueStrs, "header", "H", []string{}, "HTTP header")
 	RootCmd.Flags().BoolVarP(&flags.showsVersion, "version", "V", false, "show version")
 	RootCmd.Flags().BoolVarP(&flags.verbose, "verbose", "v", false, "verbose output")
-	RootCmd.Flags().BoolVarP(&flags.listens, "listen", "l", false, "listen mode")
-	RootCmd.Flags().BoolVarP(&flags.usesUdp, "udp", "u", false, "UDP")
 }
 
 var RootCmd = &cobra.Command{
@@ -58,43 +50,7 @@ var RootCmd = &cobra.Command{
 			fmt.Println(version.Version)
 			return nil
 		}
-		if len(args) != 2 {
-			return fmt.Errorf("port and path are required")
-		}
-		portStr := args[0]
-		path := args[1]
-		port, err := strconv.Atoi(portStr)
-		if err != nil {
-			return err
-		}
-
-		var logger *log.Logger
-		if flags.verbose {
-			logger = log.New(os.Stderr, "", log.LstdFlags)
-		} else {
-			logger = log.New(io.Discard, "", 0)
-		}
-
-		httpClient := createHttpClient(flags.insecure)
-		if flags.dnsServer != "" {
-			httpClient.Transport.(*http.Transport).DialContext = createDialContext(flags.dnsServer)
-		}
-
-		httpHeaders, err := parseHeaderKeyValueStrs(flags.httpHeaderKeyValueStrs)
-		if err != nil {
-			return err
-		}
-
-		if flags.usesUdp {
-			if flags.listens {
-				return core.Listener(logger, httpClient, flags.pipingServerUrl, httpHeaders, core.NetworkTypeUdp, uint16(port), path)
-			}
-			return core.Dialer(logger, httpClient, flags.pipingServerUrl, httpHeaders, core.NetworkTypeUdp, uint16(port), path)
-		}
-		if flags.listens {
-			return core.Listener(logger, httpClient, flags.pipingServerUrl, httpHeaders, core.NetworkTypeTcp, uint16(port), path)
-		}
-		return core.Dialer(logger, httpClient, flags.pipingServerUrl, httpHeaders, core.NetworkTypeTcp, uint16(port), path)
+		return cmd.Help()
 	},
 }
 
