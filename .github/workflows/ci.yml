@@ -68,7 +68,7 @@ jobs:
       run: |
         set -eu
         path=$(echo ${{ secrets.PATH_SALT }} ${{ github.sha }} | sha256sum | cut -d' ' -f1)
-        ./webrtc-piping -s https://ppng.io tunnel 8888 ${path} &
+        ./webrtc-piping -s https://ppng.io --ice-servers='[{"urls": "stun:stun.l.google.com:19302"}]' tunnel 8888 ${path} &
         sleep 10
 
   operational_test_peer2:
@@ -88,7 +88,7 @@ jobs:
         run: |
           set -eu
           path=$(echo ${{ secrets.PATH_SALT }} ${{ github.sha }} | sha256sum | cut -d' ' -f1)
-          ./webrtc-piping -s https://ppng.io tunnel -l 9999 ${path} &
+          ./webrtc-piping -s https://ppng.io --ice-servers='[{"urls": "stun:stun.l.google.com:19302"}]' tunnel -l 9999 ${path} &
           sleep 1
           curl -fsS localhost:9999
           curl -fsS localhost:9999
