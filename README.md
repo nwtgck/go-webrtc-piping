@@ -54,3 +54,35 @@ echo hello1 | webrtc-piping duplex mypath1 mypath2
 echo hello2 | webrtc-piping duplex mypath2 mypath1
 # => hello1
 ```
+
+## Without ICE servers
+
+Specify `--ice-servers='[]'`.
+
+## Help
+
+```
+WebRTC tunnel with Piping Server WebRTC signaling
+
+Usage:
+  webrtc-piping [flags]
+  webrtc-piping [command]
+
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  duplex      Duplex communication
+  help        Help about any command
+  tunnel      Tunneling TCP or UDP
+
+Flags:
+      --dns-server string    DNS server (e.g. 1.1.1.1:53)
+  -H, --header stringArray   HTTP header
+  -h, --help                 help for webrtc-piping
+      --ice-servers json     ICE servers (default [{"urls":["stun:stun.l.google.com:19302"]}])
+  -k, --insecure             Allow insecure server connections when using SSL
+  -s, --server string        Piping Server URL (default "https://ppng.io")
+  -v, --verbose              verbose output
+  -V, --version              show version
+
+Use "webrtc-piping [command] --help" for more information about a command.
+```
