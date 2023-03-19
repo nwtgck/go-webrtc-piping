@@ -52,8 +52,8 @@ jobs:
         ./webrtc-piping -s http://localhost:8080 tunnel 8888 mypath &
         ./webrtc-piping -s http://localhost:8080 tunnel -l 9999 mypath &
         sleep 1
-        curl -sS localhost:8888
-        curl -sS localhost:8888
+        curl -fsS localhost:8888
+        curl -fsS localhost:8888
         
     - name: Duplex communication
       run: |
