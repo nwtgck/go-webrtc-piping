@@ -39,6 +39,7 @@ func NewOffer(logger *log.Logger, httpClient *http.Client, pipingServerUrlStr st
 
 func (o *Offer) Start() error {
 	errCh := make(chan error)
+	var wg sync.WaitGroup
 
 	candidatesMux := sync.Mutex{}
 	pendingCandidates := make([]*webrtc.ICECandidate, 0)
@@ -119,7 +120,9 @@ func (o *Offer) Start() error {
 		return fmt.Errorf("unsupported answer-side version: %d", answerInitial.Version)
 	}
 
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		for {
 			candidates, err := receiveCandidates(o.httpClient, o.pipingServerUrl, o.httpHeaders, o.offerSideId, o.answerSideId)
 			if err != nil {
@@ -138,7 +141,9 @@ func (o *Offer) Start() error {
 		}
 	}()
 
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		var sdp *webrtc.SessionDescription
 		var err error
 		for {
@@ -184,6 +189,7 @@ func (o *Offer) Start() error {
 		break
 	}
 
+	wg.Wait()
 	return <-errCh
 }
 
