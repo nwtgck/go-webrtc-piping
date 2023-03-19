@@ -59,15 +59,16 @@ var TunnelCmd = &cobra.Command{
 			return err
 		}
 
+		webrtcConfig := createWebrtcConfig()
 		if tunnelFlags.usesUdp {
 			if tunnelFlags.listens {
-				return tunnel.Listener(logger, httpClient, flags.pipingServerUrl, httpHeaders, tunnel.NetworkTypeUdp, uint16(port), path)
+				return tunnel.Listener(logger, httpClient, flags.pipingServerUrl, httpHeaders, tunnel.NetworkTypeUdp, uint16(port), path, webrtcConfig)
 			}
-			return tunnel.Dialer(logger, httpClient, flags.pipingServerUrl, httpHeaders, tunnel.NetworkTypeUdp, uint16(port), path)
+			return tunnel.Dialer(logger, httpClient, flags.pipingServerUrl, httpHeaders, tunnel.NetworkTypeUdp, uint16(port), path, webrtcConfig)
 		}
 		if tunnelFlags.listens {
-			return tunnel.Listener(logger, httpClient, flags.pipingServerUrl, httpHeaders, tunnel.NetworkTypeTcp, uint16(port), path)
+			return tunnel.Listener(logger, httpClient, flags.pipingServerUrl, httpHeaders, tunnel.NetworkTypeTcp, uint16(port), path, webrtcConfig)
 		}
-		return tunnel.Dialer(logger, httpClient, flags.pipingServerUrl, httpHeaders, tunnel.NetworkTypeTcp, uint16(port), path)
+		return tunnel.Dialer(logger, httpClient, flags.pipingServerUrl, httpHeaders, tunnel.NetworkTypeTcp, uint16(port), path, webrtcConfig)
 	},
 }

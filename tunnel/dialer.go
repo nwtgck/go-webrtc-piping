@@ -13,17 +13,17 @@ import (
 	"strconv"
 )
 
-func Dialer(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, networkType NetworkType, port uint16, path string) error {
+func Dialer(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, networkType NetworkType, port uint16, path string, webrtcConfig webrtc.Configuration) error {
 	logger.Printf("answer-side")
 	errCh := make(chan error)
 
 	var peerConnection *webrtc.PeerConnection
 	var err error
 	if networkType == NetworkTypeTcp {
-		peerConnection, err = NewDetachablePeerConnection(createConfig())
+		peerConnection, err = NewDetachablePeerConnection(webrtcConfig)
 	} else {
 		// NOTE: UDP does not need to detach
-		peerConnection, err = webrtc.NewPeerConnection(createConfig())
+		peerConnection, err = webrtc.NewPeerConnection(webrtcConfig)
 	}
 	if err != nil {
 		return err

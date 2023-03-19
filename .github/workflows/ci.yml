@@ -29,8 +29,10 @@ jobs:
               # Build
               CGO_ENABLED=0 go build -o "${BUILD_PATH}/webrtc-piping${EXTENSION}" main.go
           done
+
   operational_test:
     runs-on: ubuntu-20.04
+    timeout-minutes: 2
     defaults:
       run:
         shell: bash
@@ -40,10 +42,9 @@ jobs:
     - name: Run Piping Server
       run: docker run -d -p 8080:8080 nwtgck/piping-server:v1.12.4
     - uses: actions/checkout@v3
-    - name: Set up Go 1.x
-      uses: actions/setup-go@v4
+    - uses: actions/setup-go@v4
       with:
-        go-version: 1.18
+        go-version: 1.19
     - run: CGO_ENABLED=0 go build -o webrtc-piping main.go
 
     - name: TCP tunnel
@@ -52,8 +53,8 @@ jobs:
         ./webrtc-piping -s http://localhost:8080 tunnel 8888 mypath &
         ./webrtc-piping -s http://localhost:8080 tunnel -l 9999 mypath &
         sleep 1
-        curl -fsS localhost:8888
-        curl -fsS localhost:8888
+        curl -fsS localhost:9999
+        curl -fsS localhost:9999
         
     - name: Duplex communication
       run: |
@@ -63,3 +64,31 @@ jobs:
         sleep 1
         diff <(echo hello2) peer1-out.txt
         diff <(echo hello1) peer2-out.txt
+    - name: Peer1 TCP tunneling
+      run: |
+        set -eu
+        path=$(echo ${{ secrets.PATH_SALT }} ${{ github.sha }} | sha256sum | cut -d' ' -f1)
+        ./webrtc-piping -s https://ppng.io --ice-servers='[{"urls": "stun:stun.l.google.com:19302"}]' tunnel 8888 ${path} &
+        sleep 10
+
+  operational_test_peer2:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 2
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: 1.19
+      - run: CGO_ENABLED=0 go build -o webrtc-piping main.go
+
+      - name: Peer2 TCP tunneling
+        run: |
+          set -eu
+          path=$(echo ${{ secrets.PATH_SALT }} ${{ github.sha }} | sha256sum | cut -d' ' -f1)
+          ./webrtc-piping -s https://ppng.io --ice-servers='[{"urls": "stun:stun.l.google.com:19302"}]' tunnel -l 9999 ${path} &
+          sleep 1
+          curl -fsS localhost:9999
+          curl -fsS localhost:9999

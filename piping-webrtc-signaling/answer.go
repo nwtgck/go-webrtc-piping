@@ -39,6 +39,7 @@ func NewAnswer(logger *log.Logger, httpClient *http.Client, pipingServerUrlStr s
 
 func (a *Answer) Start() error {
 	errCh := make(chan error)
+	var wg sync.WaitGroup
 
 	candidatesMux := sync.Mutex{}
 	pendingCandidates := make([]*webrtc.ICECandidate, 0)
@@ -107,7 +108,9 @@ func (a *Answer) Start() error {
 		break
 	}
 
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		for {
 			candidates, err := receiveCandidates(a.httpClient, a.pipingServerUrl, a.httpHeaders, a.answerSideId, a.offerSideId)
 			if err != nil {
@@ -127,7 +130,9 @@ func (a *Answer) Start() error {
 		}
 	}()
 
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		var sdp *webrtc.SessionDescription
 		var err error
 		for {
@@ -184,6 +189,7 @@ func (a *Answer) Start() error {
 		}
 	}()
 
+	wg.Wait()
 	return <-errCh
 }
 

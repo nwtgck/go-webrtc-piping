@@ -12,17 +12,6 @@ const (
 	NetworkTypeUdp
 )
 
-func createConfig() webrtc.Configuration {
-	return webrtc.Configuration{
-		ICEServers: []webrtc.ICEServer{
-			{
-				// TODO: hard code
-				URLs: []string{"stun:stun.l.google.com:19302"},
-			},
-		},
-	}
-}
-
 func NewDetachablePeerConnection(configuration webrtc.Configuration) (*webrtc.PeerConnection, error) {
 	m := &webrtc.MediaEngine{}
 	if err := m.RegisterDefaultCodecs(); err != nil {
