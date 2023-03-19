@@ -8,7 +8,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Set up Go 1.x
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
           go-version: 1.18
       - name: Build for multi-platform
@@ -41,7 +41,7 @@ jobs:
       run: docker run -d -p 8080:8080 nwtgck/piping-server:v1.12.4
     - uses: actions/checkout@v3
     - name: Set up Go 1.x
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v4
       with:
         go-version: 1.18
     - run: CGO_ENABLED=0 go build -o webrtc-piping main.go
