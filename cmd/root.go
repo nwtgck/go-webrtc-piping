@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"github.com/nwtgck/go-webrtc-piping/version"
 	"github.com/pion/webrtc/v3"
@@ -23,8 +24,42 @@ var flags struct {
 	dnsServer              string
 	insecure               bool
 	httpHeaderKeyValueStrs []string
+	iceServers             []iceServerFlag
 	showsVersion           bool
 	verbose                bool
+}
+
+type iceServerFlag struct {
+	URLs       iceServerFlagUrls `json:"urls"`
+	Username   string            `json:"username,omitempty"`
+	Credential string            `json:"credential,omitempty"`
+	// NOTE: credentialType is deprecated
+}
+
+// iceServerFlagUrls is string or []string
+type iceServerFlagUrls struct {
+	values []string
+}
+
+var _ json.Marshaler = (*iceServerFlagUrls)(nil)
+var _ json.Unmarshaler = (*iceServerFlagUrls)(nil)
+
+func (u *iceServerFlagUrls) MarshalJSON() ([]byte, error) {
+	return json.Marshal(u.values)
+}
+
+func (u *iceServerFlagUrls) UnmarshalJSON(b []byte) error {
+	var stringValue string
+	err := json.Unmarshal(b, &stringValue)
+	if err == nil {
+		u.values = []string{stringValue}
+		return nil
+	}
+	err = json.Unmarshal(b, &u.values)
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("urls is not string or string array")
 }
 
 func init() {
@@ -33,11 +68,15 @@ func init() {
 	if !ok {
 		defaultServer = "https://ppng.io"
 	}
+	flags.iceServers = []iceServerFlag{
+		{URLs: iceServerFlagUrls{values: []string{"stun:stun.l.google.com:19302"}}},
+	}
 	RootCmd.PersistentFlags().StringVarP(&flags.pipingServerUrl, "server", "s", defaultServer, "Piping Server URL")
 	RootCmd.PersistentFlags().StringVar(&flags.dnsServer, "dns-server", "", "DNS server (e.g. 1.1.1.1:53)")
 	// --insecure, -k is inspired by curl
 	RootCmd.PersistentFlags().BoolVarP(&flags.insecure, "insecure", "k", false, "Allow insecure server connections when using SSL")
 	RootCmd.PersistentFlags().StringArrayVarP(&flags.httpHeaderKeyValueStrs, "header", "H", []string{}, "HTTP header")
+	RootCmd.PersistentFlags().VarP(&JsonFlag{Value: &flags.iceServers}, "ice-servers", "", "ICE servers")
 	RootCmd.PersistentFlags().BoolVarP(&flags.showsVersion, "version", "V", false, "show version")
 	RootCmd.PersistentFlags().BoolVarP(&flags.verbose, "verbose", "v", false, "verbose output")
 }
@@ -100,12 +139,15 @@ func parseHeaderKeyValueStrs(strKeyValues []string) ([][]string, error) {
 }
 
 func createWebrtcConfig() webrtc.Configuration {
+	iceServer := make([]webrtc.ICEServer, len(flags.iceServers))
+	for i, d := range flags.iceServers {
+		iceServer[i] = webrtc.ICEServer{
+			URLs:       d.URLs.values,
+			Username:   d.Username,
+			Credential: d.Credential,
+		}
+	}
 	return webrtc.Configuration{
-		ICEServers: []webrtc.ICEServer{
-			{
-				// TODO: hard code
-				URLs: []string{"stun:stun.l.google.com:19302"},
-			},
-		},
+		ICEServers: iceServer,
 	}
 }
