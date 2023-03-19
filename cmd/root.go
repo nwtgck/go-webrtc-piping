@@ -42,9 +42,10 @@ func init() {
 }
 
 var RootCmd = &cobra.Command{
-	Use:   os.Args[0],
-	Short: "webrtc-piping",
-	Long:  "WebRTC tunnel with Piping Server WebRTC signaling",
+	Use:          os.Args[0],
+	Short:        "webrtc-piping",
+	Long:         "WebRTC tunnel with Piping Server WebRTC signaling",
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if flags.showsVersion {
 			fmt.Println(version.Version)
