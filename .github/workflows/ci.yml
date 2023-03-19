@@ -54,3 +54,12 @@ jobs:
         sleep 1
         curl -sS localhost:8888
         curl -sS localhost:8888
+        
+    - name: Duplex communication
+      run: |
+        set -eux
+        (echo hello1 | ./webrtc-piping -s http://localhost:8080 duplex path1 path2 > peer1-out.txt) &
+        (echo hello2 | ./webrtc-piping -s http://localhost:8080 duplex path2 path1 > peer2-out.txt) &
+        sleep 1
+        diff <(echo hello2) peer1-out.txt
+        diff <(echo hello1) peer2-out.txt
