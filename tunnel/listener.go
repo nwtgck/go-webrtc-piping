@@ -1,10 +1,10 @@
 // base: https://github.com/pion/webrtc/tree/80e5cdda5687d696556f2f2605a4c83f61ac3a08/examples/pion-to-pion
 
-package core
+package tunnel
 
 import (
 	"fmt"
-	piping_webrtc_signaling "github.com/nwtgck/go-webrtc-piping-tunnel/piping-webrtc-signaling"
+	piping_webrtc_signaling "github.com/nwtgck/go-webrtc-piping/piping-webrtc-signaling"
 	"github.com/pion/webrtc/v3"
 	"io"
 	"log"
@@ -79,7 +79,11 @@ func Listener(logger *log.Logger, httpClient *http.Client, pipingServerUrl strin
 	}()
 
 	go func() {
-		offer := piping_webrtc_signaling.NewOffer(logger, httpClient, pipingServerUrl, httpHeaders, peerConnection, offerSideId(path), answerSideId(path))
+		offer, err := piping_webrtc_signaling.NewOffer(logger, httpClient, pipingServerUrl, httpHeaders, peerConnection, offerSideId(path), answerSideId(path))
+		if err != nil {
+			errCh <- err
+			return
+		}
 		if err := offer.Start(); err != nil {
 			errCh <- err
 		}

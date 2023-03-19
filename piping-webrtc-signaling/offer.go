@@ -1,59 +1,74 @@
 package piping_webrtc_signaling
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/pion/webrtc/v3"
-	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 )
 
 type Offer struct {
-	pipingServerUrl   string
-	httpHeaders       [][]string
-	peerConnection    *webrtc.PeerConnection
-	offerSideId       string
-	answerSideId      string
-	logger            *log.Logger
-	httpClient        *http.Client
-	candidatesMux     sync.Mutex
-	pendingCandidates []*webrtc.ICECandidate
+	pipingServerUrl *url.URL
+	httpHeaders     [][]string
+	peerConnection  *webrtc.PeerConnection
+	offerSideId     string
+	answerSideId    string
+	logger          *log.Logger
+	httpClient      *http.Client
 }
 
-func NewOffer(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, peerConnection *webrtc.PeerConnection, offerSideId string, answerSideId string) *Offer {
-	return &Offer{
-		pipingServerUrl:   pipingServerUrl,
-		httpHeaders:       httpHeaders,
-		peerConnection:    peerConnection,
-		offerSideId:       offerSideId,
-		answerSideId:      answerSideId,
-		logger:            logger,
-		httpClient:        httpClient,
-		candidatesMux:     sync.Mutex{},
-		pendingCandidates: make([]*webrtc.ICECandidate, 0),
+func NewOffer(logger *log.Logger, httpClient *http.Client, pipingServerUrlStr string, httpHeaders [][]string, peerConnection *webrtc.PeerConnection, offerSideId string, answerSideId string) (*Offer, error) {
+	pipingServerUrl, err := url.Parse(pipingServerUrlStr)
+	if err != nil {
+		return nil, err
 	}
+	return &Offer{
+		pipingServerUrl: pipingServerUrl,
+		httpHeaders:     httpHeaders,
+		peerConnection:  peerConnection,
+		offerSideId:     offerSideId,
+		answerSideId:    answerSideId,
+		logger:          logger,
+		httpClient:      httpClient,
+	}, nil
 }
 
 func (o *Offer) Start() error {
 	errCh := make(chan error)
 
+	candidatesMux := sync.Mutex{}
+	pendingCandidates := make([]*webrtc.ICECandidate, 0)
+	candidateFinished := false
+	notifiedCandidateFinish := false
+
 	o.peerConnection.OnICECandidate(func(c *webrtc.ICECandidate) {
 		o.logger.Printf("OnICECandidate: %s", c)
+
+		candidatesMux.Lock()
+		defer candidatesMux.Unlock()
+
+		desc := o.peerConnection.RemoteDescription()
+
 		if c == nil {
+			candidateFinished = true
+			if desc == nil {
+				return
+			}
+			if err := o.sendCandidates([]*webrtc.ICECandidate{}); err != nil {
+				errCh <- err
+				return
+			}
+			notifiedCandidateFinish = true
 			return
 		}
 
-		o.candidatesMux.Lock()
-		defer o.candidatesMux.Unlock()
-
-		desc := o.peerConnection.RemoteDescription()
 		if desc == nil {
-			o.pendingCandidates = append(o.pendingCandidates, c)
-		} else if err := o.sendCandidate(c); err != nil {
+			pendingCandidates = append(pendingCandidates, c)
+		} else if err := o.sendCandidates([]*webrtc.ICECandidate{c}); err != nil {
 			errCh <- err
 		}
 	})
@@ -66,39 +81,59 @@ func (o *Offer) Start() error {
 		return err
 	}
 
-	initial := InitialJson{Version: 1}
-	initialBytes, err := json.Marshal(initial)
+	offerInitial := OfferInitialJson{Version: 1}
+	offerInitialBytes, err := json.Marshal(offerInitial)
 	if err != nil {
 		return err
 	}
 	for {
-		res, err := o.httpClient.Post(fmt.Sprintf("%s/%s-%s", o.pipingServerUrl, o.offerSideId, o.answerSideId), "application/json; charset=utf-8", bytes.NewReader(initialBytes))
+		err := pipingPostJson(o.httpClient, urlJoin(o.pipingServerUrl, sha256String(fmt.Sprintf("%s-%s", o.offerSideId, o.answerSideId))), o.httpHeaders, offerInitialBytes)
 		if err != nil {
-			goto retry
-		}
-		if _, err = io.Copy(io.Discard, res.Body); err != nil {
-			goto retry
-		}
-		if err = res.Body.Close(); err != nil {
-			goto retry
+			o.logger.Printf("failed to send offerInitial: %+v", err)
+			time.Sleep(3 * time.Second)
+			continue
 		}
 		break
-	retry:
-		time.Sleep(3 * time.Second)
-		continue
+	}
+	var answerInitial AnswerInitialJson
+	for {
+		err := func() error {
+			answerInitialBytes, err := httpGetWithHeaders(o.httpClient, urlJoin(o.pipingServerUrl, sha256String(fmt.Sprintf("%s-%s", o.answerSideId, o.offerSideId))), o.httpHeaders)
+			if err != nil {
+				return err
+			}
+			if err = json.Unmarshal(answerInitialBytes, &answerInitial); err != nil {
+				return err
+			}
+			return nil
+		}()
+		if err != nil {
+			o.logger.Printf("error: %+v", err)
+			time.Sleep(3 * time.Second)
+			continue
+		}
+		break
+	}
+	o.logger.Printf("answerInitial: %+v", answerInitial)
+	if answerInitial.Version > 1 {
+		return fmt.Errorf("unsupported answer-side version: %d", answerInitial.Version)
 	}
 
 	go func() {
-		// TODO: finish loop when connected
 		for {
-			candidate, err := receiveCandidate(o.httpClient, o.pipingServerUrl, o.httpHeaders, o.offerSideId, o.answerSideId)
+			candidates, err := receiveCandidates(o.httpClient, o.pipingServerUrl, o.httpHeaders, o.offerSideId, o.answerSideId)
 			if err != nil {
 				errCh <- err
 				return
 			}
-			if err := o.peerConnection.AddICECandidate(*candidate); err != nil {
-				errCh <- err
-				return
+			if len(candidates) == 0 {
+				break
+			}
+			for _, candidate := range candidates {
+				if err := o.peerConnection.AddICECandidate(candidate); err != nil {
+					errCh <- err
+					return
+				}
 			}
 		}
 	}()
@@ -120,17 +155,23 @@ func (o *Offer) Start() error {
 			errCh <- err
 			return
 		}
-		o.candidatesMux.Lock()
-		defer o.candidatesMux.Unlock()
-		for _, c := range o.pendingCandidates {
+		candidatesMux.Lock()
+		defer candidatesMux.Unlock()
+		if len(pendingCandidates) != 0 {
 			for {
-				if err := o.sendCandidate(c); err != nil {
-					o.logger.Printf("failed to send candidate")
+				if err := o.sendCandidates(pendingCandidates); err != nil {
+					o.logger.Printf("failed to send candidates")
 					time.Sleep(3 * time.Second)
 					continue
 				}
 				break
 			}
+		}
+		if candidateFinished && !notifiedCandidateFinish {
+			if err := o.sendCandidates([]*webrtc.ICECandidate{}); err != nil {
+				errCh <- err
+			}
+			notifiedCandidateFinish = true
 		}
 	}()
 
@@ -146,6 +187,6 @@ func (o *Offer) Start() error {
 	return <-errCh
 }
 
-func (o *Offer) sendCandidate(candidate *webrtc.ICECandidate) error {
-	return sendCandidate(o.logger, o.httpClient, o.pipingServerUrl, o.httpHeaders, o.offerSideId, o.answerSideId, candidate)
+func (o *Offer) sendCandidates(candidates []*webrtc.ICECandidate) error {
+	return sendCandidates(o.logger, o.httpClient, o.pipingServerUrl, o.httpHeaders, o.offerSideId, o.answerSideId, candidates)
 }

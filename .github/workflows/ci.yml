@@ -1,16 +1,16 @@
 name: CI
 
-on: [push, pull_request]
+on: [push]
 
 jobs:
   build_multi_platform:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Set up Go 1.x
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
-          go-version: 1.18
+          go-version: 1.19
       - name: Build for multi-platform
         run: |
           set -xeu
@@ -24,10 +24,10 @@ jobs:
               export GOOS=${platform_split[0]}
               export GOARCH=${platform_split[1]}
               [ $GOOS = "windows" ] && EXTENSION='.exe' || EXTENSION=''
-              BUILD_PATH=webrtc-piping-tunnel-$GOOS-$GOARCH
+              BUILD_PATH=webrtc-piping-$GOOS-$GOARCH
               mkdir $BUILD_PATH
               # Build
-              CGO_ENABLED=0 go build -o "${BUILD_PATH}/webrtc-piping-tunnel${EXTENSION}" main.go
+              CGO_ENABLED=0 go build -o "${BUILD_PATH}/webrtc-piping${EXTENSION}" main.go
           done
   operational_test:
     runs-on: ubuntu-20.04
@@ -39,18 +39,27 @@ jobs:
       run: docker run -d -p 8888:80 nginx:alpine
     - name: Run Piping Server
       run: docker run -d -p 8080:8080 nwtgck/piping-server:v1.12.4
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set up Go 1.x
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v4
       with:
         go-version: 1.18
-    - run: CGO_ENABLED=0 go build -o webrtc-piping-tunnel main.go
+    - run: CGO_ENABLED=0 go build -o webrtc-piping main.go
 
     - name: TCP tunnel
       run: |
         set -eux
-        ./webrtc-piping-tunnel -s http://localhost:8080 8888 mypath &
-        ./webrtc-piping-tunnel -s http://localhost:8080 -l 9999 mypath &
+        ./webrtc-piping -s http://localhost:8080 tunnel 8888 mypath &
+        ./webrtc-piping -s http://localhost:8080 tunnel -l 9999 mypath &
         sleep 1
-        curl -sS localhost:8888
-        curl -sS localhost:8888
+        curl -fsS localhost:8888
+        curl -fsS localhost:8888
+        
+    - name: Duplex communication
+      run: |
+        set -eux
+        (echo hello1 | ./webrtc-piping -s http://localhost:8080 duplex path1 path2 > peer1-out.txt) &
+        (echo hello2 | ./webrtc-piping -s http://localhost:8080 duplex path2 path1 > peer2-out.txt) &
+        sleep 1
+        diff <(echo hello2) peer1-out.txt
+        diff <(echo hello1) peer2-out.txt

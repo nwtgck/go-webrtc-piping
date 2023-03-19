@@ -1,15 +1,8 @@
-package core
+package duplex
 
 import (
 	"github.com/pion/interceptor"
 	"github.com/pion/webrtc/v3"
-)
-
-type NetworkType int64
-
-const (
-	NetworkTypeTcp NetworkType = iota
-	NetworkTypeUdp
 )
 
 func createConfig() webrtc.Configuration {
@@ -41,12 +34,4 @@ func NewDetachablePeerConnection(configuration webrtc.Configuration) (*webrtc.Pe
 	//api := webrtc.NewAPI(webrtc.WithMediaEngine(m), webrtc.WithInterceptorRegistry(i))
 	return api.NewPeerConnection(configuration)
 	//return webrtc.NewPeerConnection(configuration)
-}
-
-func offerSideId(path string) string {
-	return "offer_" + path
-}
-
-func answerSideId(path string) string {
-	return "answer_" + path
 }
