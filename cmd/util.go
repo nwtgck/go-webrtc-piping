@@ -6,21 +6,21 @@ import (
 	"github.com/spf13/pflag"
 )
 
-type JsonFlag struct {
+type JSONFlag struct {
 	Value interface{}
 }
 
-var _ pflag.Value = (*JsonFlag)(nil)
+var _ pflag.Value = (*JSONFlag)(nil)
 
-func (j *JsonFlag) Set(s string) error {
+func (j *JSONFlag) Set(s string) error {
 	return json.Unmarshal([]byte(s), j.Value)
 }
 
-func (j *JsonFlag) Type() string {
+func (j *JSONFlag) Type() string {
 	return "json"
 }
 
-func (j *JsonFlag) String() string {
+func (j *JSONFlag) String() string {
 	bs, err := json.Marshal(j.Value)
 	if err != nil {
 		return fmt.Sprintf("%v", j.Value)
