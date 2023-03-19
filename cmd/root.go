@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/nwtgck/go-webrtc-piping/version"
+	"github.com/pion/webrtc/v3"
 	"github.com/spf13/cobra"
 	"net"
 	"net/http"
@@ -96,4 +97,15 @@ func parseHeaderKeyValueStrs(strKeyValues []string) ([][]string, error) {
 		keyValues = append(keyValues, splitted)
 	}
 	return keyValues, nil
+}
+
+func createWebrtcConfig() webrtc.Configuration {
+	return webrtc.Configuration{
+		ICEServers: []webrtc.ICEServer{
+			{
+				// TODO: hard code
+				URLs: []string{"stun:stun.l.google.com:19302"},
+			},
+		},
+	}
 }

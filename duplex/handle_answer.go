@@ -12,12 +12,12 @@ import (
 	"os"
 )
 
-func HandleAnswer(logger *log.Logger, pipingServerUrl string, localId string, remoteId string) error {
+func HandleAnswer(logger *log.Logger, pipingServerUrl string, localId string, remoteId string, webrtcConfig webrtc.Configuration) error {
 	logger.Printf("answer-side")
 	errCh := make(chan error)
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := NewDetachablePeerConnection(createConfig())
+	peerConnection, err := NewDetachablePeerConnection(webrtcConfig)
 	if err != nil {
 		return err
 	}
