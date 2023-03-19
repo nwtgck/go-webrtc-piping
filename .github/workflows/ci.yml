@@ -24,10 +24,10 @@ jobs:
               export GOOS=${platform_split[0]}
               export GOARCH=${platform_split[1]}
               [ $GOOS = "windows" ] && EXTENSION='.exe' || EXTENSION=''
-              BUILD_PATH=webrtc-piping-tunnel-$GOOS-$GOARCH
+              BUILD_PATH=webrtc-piping-$GOOS-$GOARCH
               mkdir $BUILD_PATH
               # Build
-              CGO_ENABLED=0 go build -o "${BUILD_PATH}/webrtc-piping-tunnel${EXTENSION}" main.go
+              CGO_ENABLED=0 go build -o "${BUILD_PATH}/webrtc-piping${EXTENSION}" main.go
           done
   operational_test:
     runs-on: ubuntu-20.04
@@ -44,13 +44,13 @@ jobs:
       uses: actions/setup-go@v2
       with:
         go-version: 1.18
-    - run: CGO_ENABLED=0 go build -o webrtc-piping-tunnel main.go
+    - run: CGO_ENABLED=0 go build -o webrtc-piping main.go
 
     - name: TCP tunnel
       run: |
         set -eux
-        ./webrtc-piping-tunnel -s http://localhost:8080 8888 mypath &
-        ./webrtc-piping-tunnel -s http://localhost:8080 -l 9999 mypath &
+        ./webrtc-piping -s http://localhost:8080 8888 mypath &
+        ./webrtc-piping -s http://localhost:8080 -l 9999 mypath &
         sleep 1
         curl -sS localhost:8888
         curl -sS localhost:8888

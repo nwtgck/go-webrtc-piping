@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/nwtgck/go-webrtc-piping-tunnel/cmd"
+	"github.com/nwtgck/go-webrtc-piping/cmd"
 	"os"
 )
 

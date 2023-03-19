@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/nwtgck/go-webrtc-piping-tunnel/core"
-	"github.com/nwtgck/go-webrtc-piping-tunnel/version"
+	"github.com/nwtgck/go-webrtc-piping/core"
+	"github.com/nwtgck/go-webrtc-piping/version"
 	"github.com/spf13/cobra"
 	"io"
 	"log"
@@ -51,7 +51,7 @@ func init() {
 
 var RootCmd = &cobra.Command{
 	Use:   os.Args[0],
-	Short: "webrtc-piping-tunnel",
+	Short: "webrtc-piping",
 	Long:  "WebRTC tunnel with Piping Server WebRTC signaling",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if flags.showsVersion {

@@ -1,4 +1,4 @@
-module github.com/nwtgck/go-webrtc-piping-tunnel
+module github.com/nwtgck/go-webrtc-piping
 
 go 1.18
 

@@ -4,7 +4,7 @@ package core
 
 import (
 	"fmt"
-	piping_webrtc_signaling "github.com/nwtgck/go-webrtc-piping-tunnel/piping-webrtc-signaling"
+	piping_webrtc_signaling "github.com/nwtgck/go-webrtc-piping/piping-webrtc-signaling"
 	"github.com/pion/webrtc/v3"
 	"io"
 	"log"
