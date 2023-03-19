@@ -98,11 +98,14 @@ var RootCmd = &cobra.Command{
 	},
 }
 
-func createHttpClient(insecureSkipVerify bool) *http.Client {
+func createHttpClient(insecureSkipVerify bool, dnsServer string /* empty string OK */) *http.Client {
 	// Set insecure or not
 	tr := &http.Transport{
 		TLSClientConfig:   &tls.Config{InsecureSkipVerify: insecureSkipVerify},
 		ForceAttemptHTTP2: true,
+	}
+	if dnsServer != "" {
+		tr.DialContext = createDialContext(dnsServer)
 	}
 	return &http.Client{Transport: tr}
 }
