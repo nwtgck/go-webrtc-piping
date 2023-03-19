@@ -45,6 +45,9 @@ var _ json.Marshaler = (*iceServerFlagUrls)(nil)
 var _ json.Unmarshaler = (*iceServerFlagUrls)(nil)
 
 func (u *iceServerFlagUrls) MarshalJSON() ([]byte, error) {
+	if len(u.values) == 1 {
+		return json.Marshal(u.values[0])
+	}
 	return json.Marshal(u.values)
 }
 
