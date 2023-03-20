@@ -6,7 +6,6 @@ import (
 	"github.com/spf13/cobra"
 	"io"
 	"log"
-	"net/http"
 	"os"
 	"strconv"
 )
@@ -49,11 +48,7 @@ var TunnelCmd = &cobra.Command{
 			logger = log.New(io.Discard, "", 0)
 		}
 
-		httpClient := createHttpClient(flags.insecure)
-		if flags.dnsServer != "" {
-			httpClient.Transport.(*http.Transport).DialContext = createDialContext(flags.dnsServer)
-		}
-
+		httpClient := createHttpClient(flags.insecure, flags.dnsServer)
 		httpHeaders, err := parseHeaderKeyValueStrs(flags.httpHeaderKeyValueStrs)
 		if err != nil {
 			return err

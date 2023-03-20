@@ -30,11 +30,16 @@ var DuplexCmd = &cobra.Command{
 		} else {
 			logger = log.New(io.Discard, "", 0)
 		}
+		httpClient := createHttpClient(flags.insecure, flags.dnsServer)
+		httpHeaders, err := parseHeaderKeyValueStrs(flags.httpHeaderKeyValueStrs)
+		if err != nil {
+			return err
+		}
 		webrtcConfig := createWebrtcConfig()
 		if localId < remoteId {
-			return duplex.HandleOffer(logger, flags.pipingServerUrl, localId, remoteId, webrtcConfig)
+			return duplex.HandleOffer(logger, httpClient, flags.pipingServerUrl, httpHeaders, localId, remoteId, webrtcConfig)
 		} else {
-			return duplex.HandleAnswer(logger, flags.pipingServerUrl, localId, remoteId, webrtcConfig)
+			return duplex.HandleAnswer(logger, httpClient, flags.pipingServerUrl, httpHeaders, localId, remoteId, webrtcConfig)
 		}
 	},
 }

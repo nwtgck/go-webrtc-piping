@@ -45,6 +45,9 @@ var _ json.Marshaler = (*iceServerFlagUrls)(nil)
 var _ json.Unmarshaler = (*iceServerFlagUrls)(nil)
 
 func (u *iceServerFlagUrls) MarshalJSON() ([]byte, error) {
+	if len(u.values) == 1 {
+		return json.Marshal(u.values[0])
+	}
 	return json.Marshal(u.values)
 }
 
@@ -76,7 +79,7 @@ func init() {
 	// --insecure, -k is inspired by curl
 	RootCmd.PersistentFlags().BoolVarP(&flags.insecure, "insecure", "k", false, "Allow insecure server connections when using SSL")
 	RootCmd.PersistentFlags().StringArrayVarP(&flags.httpHeaderKeyValueStrs, "header", "H", []string{}, "HTTP header")
-	RootCmd.PersistentFlags().VarP(&JsonFlag{Value: &flags.iceServers}, "ice-servers", "", "ICE servers")
+	RootCmd.PersistentFlags().VarP(&JSONFlag{Value: &flags.iceServers}, "ice-servers", "i", "ICE servers")
 	RootCmd.PersistentFlags().BoolVarP(&flags.showsVersion, "version", "V", false, "show version")
 	RootCmd.PersistentFlags().BoolVarP(&flags.verbose, "verbose", "v", false, "verbose output")
 }
@@ -95,11 +98,14 @@ var RootCmd = &cobra.Command{
 	},
 }
 
-func createHttpClient(insecureSkipVerify bool) *http.Client {
+func createHttpClient(insecureSkipVerify bool, dnsServer string /* empty string OK */) *http.Client {
 	// Set insecure or not
 	tr := &http.Transport{
 		TLSClientConfig:   &tls.Config{InsecureSkipVerify: insecureSkipVerify},
 		ForceAttemptHTTP2: true,
+	}
+	if dnsServer != "" {
+		tr.DialContext = createDialContext(dnsServer)
 	}
 	return &http.Client{Transport: tr}
 }
