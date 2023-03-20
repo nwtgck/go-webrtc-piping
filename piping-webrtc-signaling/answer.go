@@ -93,7 +93,7 @@ func (a *Answer) Start() error {
 	}
 	a.logger.Printf("offerInitial: %+v", offerInitial)
 
-	answerInitial := AnswerInitialJson{Version: 1}
+	answerInitial := AnswerInitialJson{Version: 2}
 	answerInitialBytes, err := json.Marshal(answerInitial)
 	if err != nil {
 		return err

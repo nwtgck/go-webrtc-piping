@@ -6,10 +6,8 @@ import (
 	"fmt"
 	piping_webrtc_signaling "github.com/nwtgck/go-webrtc-piping/piping-webrtc-signaling"
 	"github.com/pion/webrtc/v3"
-	"io"
 	"log"
 	"net/http"
-	"os"
 )
 
 func HandleOffer(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, localId string, remoteId string, webrtcConfig webrtc.Configuration) error {
@@ -17,7 +15,7 @@ func HandleOffer(logger *log.Logger, httpClient *http.Client, pipingServerUrl st
 	errCh := make(chan error)
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := NewDetachablePeerConnection(webrtcConfig)
+	peerConnection, err := webrtc.NewPeerConnection(webrtcConfig)
 	if err != nil {
 		return err
 	}
@@ -51,17 +49,28 @@ func HandleOffer(logger *log.Logger, httpClient *http.Client, pipingServerUrl st
 	})
 
 	// Register channel opening handling
+	dataChannelCh := make(chan *webrtc.DataChannel)
 	dataChannel.OnOpen(func() {
 		logger.Printf("OnOpen")
-		raw, err := dataChannel.Detach()
-		if err != nil {
-			errCh <- err
-			return
-		}
-
-		go io.Copy(raw, os.Stdin)
-		go io.Copy(os.Stdout, raw)
+		dataChannelCh <- dataChannel
 	})
+	dcToStdoutErrCh := registerOnMessageForDataChannelToStdout(logger, dataChannel)
+
+	stdinToDcErrCh := make(chan error)
+	go func() {
+		dataChannel := <-dataChannelCh
+		stdinToDcErrCh <- stdinToDataChannel(logger, dataChannel)
+	}()
+
+	go func() {
+		if err := <-dcToStdoutErrCh; err != nil {
+			errCh <- err
+		}
+		if err := <-stdinToDcErrCh; err != nil {
+			errCh <- err
+		}
+		errCh <- nil
+	}()
 
 	go func() {
 		offer, err := piping_webrtc_signaling.NewOffer(logger, httpClient, pipingServerUrl, httpHeaders, peerConnection, localId, remoteId)

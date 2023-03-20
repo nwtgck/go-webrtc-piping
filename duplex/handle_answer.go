@@ -6,10 +6,8 @@ import (
 	"fmt"
 	piping_webrtc_signaling "github.com/nwtgck/go-webrtc-piping/piping-webrtc-signaling"
 	"github.com/pion/webrtc/v3"
-	"io"
 	"log"
 	"net/http"
-	"os"
 )
 
 func HandleAnswer(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, localId string, remoteId string, webrtcConfig webrtc.Configuration) error {
@@ -17,7 +15,7 @@ func HandleAnswer(logger *log.Logger, httpClient *http.Client, pipingServerUrl s
 	errCh := make(chan error)
 
 	// Create a new RTCPeerConnection
-	peerConnection, err := NewDetachablePeerConnection(webrtcConfig)
+	peerConnection, err := webrtc.NewPeerConnection(webrtcConfig)
 	if err != nil {
 		return err
 	}
@@ -47,17 +45,30 @@ func HandleAnswer(logger *log.Logger, httpClient *http.Client, pipingServerUrl s
 	// Register data channel creation handling
 	peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
 		logger.Printf("OnDataChannel")
+		dataChannelCh := make(chan *webrtc.DataChannel)
 		// Register channel opening handling
 		d.OnOpen(func() {
 			logger.Printf("OnOpen")
-			raw, err := d.Detach()
-			if err != nil {
-				errCh <- err
-				return
-			}
-			go io.Copy(raw, os.Stdin)
-			go io.Copy(os.Stdout, raw)
+			dataChannelCh <- d
 		})
+		// Previously detached data channel is used, however there is no way to tell finish to the detached channel.
+		dcToStdoutErrCh := registerOnMessageForDataChannelToStdout(logger, d)
+
+		stdinToDcErrCh := make(chan error)
+		go func() {
+			dataChannel := <-dataChannelCh
+			stdinToDcErrCh <- stdinToDataChannel(logger, dataChannel)
+		}()
+
+		go func() {
+			if err := <-dcToStdoutErrCh; err != nil {
+				errCh <- err
+			}
+			if err := <-stdinToDcErrCh; err != nil {
+				errCh <- err
+			}
+			errCh <- nil
+		}()
 	})
 
 	go func() {

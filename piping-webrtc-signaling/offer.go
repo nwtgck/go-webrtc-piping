@@ -82,7 +82,7 @@ func (o *Offer) Start() error {
 		return err
 	}
 
-	offerInitial := OfferInitialJson{Version: 1}
+	offerInitial := OfferInitialJson{Version: 2}
 	offerInitialBytes, err := json.Marshal(offerInitial)
 	if err != nil {
 		return err
@@ -116,7 +116,7 @@ func (o *Offer) Start() error {
 		break
 	}
 	o.logger.Printf("answerInitial: %+v", answerInitial)
-	if answerInitial.Version > 1 {
+	if answerInitial.Version != 2 {
 		return fmt.Errorf("unsupported answer-side version: %d", answerInitial.Version)
 	}
 
