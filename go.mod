@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/pion/interceptor v0.1.12
-	github.com/pion/webrtc/v3 v3.1.58
+	github.com/pion/webrtc/v3 v3.1.60
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
 )
@@ -14,7 +14,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect
 	github.com/pion/datachannel v1.5.5 // indirect
 	github.com/pion/dtls/v2 v2.2.6 // indirect
-	github.com/pion/ice/v2 v2.3.1 // indirect
+	github.com/pion/ice/v2 v2.3.2 // indirect
 	github.com/pion/logging v0.2.2 // indirect
 	github.com/pion/mdns v0.0.7 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
@@ -28,6 +28,6 @@ require (
 	github.com/pion/turn/v2 v2.1.0 // indirect
 	github.com/pion/udp/v2 v2.0.1 // indirect
 	golang.org/x/crypto v0.6.0 // indirect
-	golang.org/x/net v0.7.0 // indirect
-	golang.org/x/sys v0.5.0 // indirect
+	golang.org/x/net v0.8.0 // indirect
+	golang.org/x/sys v0.6.0 // indirect
 )
