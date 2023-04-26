@@ -3,7 +3,7 @@ module github.com/nwtgck/go-webrtc-piping
 go 1.18
 
 require (
-	github.com/pion/interceptor v0.1.13
+	github.com/pion/interceptor v0.1.16
 	github.com/pion/webrtc/v3 v3.1.62
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
