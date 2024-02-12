@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/pion/interceptor v0.1.25
-	github.com/pion/webrtc/v3 v3.2.26
+	github.com/pion/webrtc/v3 v3.2.28
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5
 )
@@ -21,7 +21,7 @@ require (
 	github.com/pion/randutil v0.1.0 // indirect
 	github.com/pion/rtcp v1.2.12 // indirect
 	github.com/pion/rtp v1.8.3 // indirect
-	github.com/pion/sctp v1.8.8 // indirect
+	github.com/pion/sctp v1.8.12 // indirect
 	github.com/pion/sdp/v3 v3.0.6 // indirect
 	github.com/pion/srtp/v2 v2.0.18 // indirect
 	github.com/pion/stun v0.6.1 // indirect
