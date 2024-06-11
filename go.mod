@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/pion/interceptor v0.1.29
-	github.com/pion/webrtc/v3 v3.2.40
+	github.com/pion/webrtc/v3 v3.2.41
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5
 )
