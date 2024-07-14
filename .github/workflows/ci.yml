@@ -29,6 +29,11 @@ jobs:
               # Build
               CGO_ENABLED=0 go build -o "${BUILD_PATH}/webrtc-piping${EXTENSION}" main.go
           done
+      - run: tar czf webrtc-piping.tar.gz webrtc-piping-*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: built_executable
+          path: webrtc-piping.tar.gz
 
   operational_test:
     runs-on: ubuntu-20.04
