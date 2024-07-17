@@ -6,6 +6,7 @@ import (
 	"fmt"
 	piping_webrtc_signaling "github.com/nwtgck/go-webrtc-piping/piping-webrtc-signaling"
 	"github.com/pion/webrtc/v3"
+	"golang.org/x/sync/errgroup"
 	"io"
 	"log"
 	"net"
@@ -15,7 +16,7 @@ import (
 
 func Dialer(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, networkType NetworkType, port uint16, path string, webrtcConfig webrtc.Configuration) error {
 	logger.Printf("answer-side")
-	errCh := make(chan error)
+	var eg errgroup.Group
 
 	var peerConnection *webrtc.PeerConnection
 	var err error
@@ -34,22 +35,28 @@ func Dialer(logger *log.Logger, httpClient *http.Client, pipingServerUrl string,
 		}
 	}()
 
-	// Set the handler for Peer connection state
-	// This will notify you when the peer has connected/disconnected
-	peerConnection.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
-		logger.Printf("Peer Connection State has changed: %s\n", s.String())
+	eg.Go(func() error {
+		errCh := make(chan error)
+		// Set the handler for Peer connection state
+		// This will notify you when the peer has connected/disconnected
+		peerConnection.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
+			logger.Printf("Peer Connection State has changed: %s\n", s.String())
 
-		switch s {
-		case webrtc.PeerConnectionStateFailed:
-			// Wait until PeerConnection has had no network activity for 30 seconds or another failure. It may be reconnected using an ICE Restart.
-			// Use webrtc.PeerConnectionStateDisconnected if you are interested in detecting faster timeout.
-			// Note that the PeerConnection may come back from PeerConnectionStateDisconnected.
-			logger.Printf("Peer Connection has gone to failed exiting")
-			errCh <- fmt.Errorf("PeerConnectionStateFailed")
-		case webrtc.PeerConnectionStateDisconnected:
-			errCh <- nil
-		}
+			switch s {
+			case webrtc.PeerConnectionStateFailed:
+				// Wait until PeerConnection has had no network activity for 30 seconds or another failure. It may be reconnected using an ICE Restart.
+				// Use webrtc.PeerConnectionStateDisconnected if you are interested in detecting faster timeout.
+				// Note that the PeerConnection may come back from PeerConnectionStateDisconnected.
+				logger.Printf("Peer Connection has gone to failed exiting")
+				errCh <- fmt.Errorf("PeerConnectionStateFailed")
+			case webrtc.PeerConnectionStateDisconnected:
+				errCh <- nil
+			default:
+			}
+		})
+		return <-errCh
 	})
+
 	switch networkType {
 	case NetworkTypeTcp:
 		tcpDialer(logger, peerConnection, port)
@@ -57,18 +64,18 @@ func Dialer(logger *log.Logger, httpClient *http.Client, pipingServerUrl string,
 		udpDialer(logger, peerConnection, port)
 	}
 
-	go func() {
+	eg.Go(func() error {
 		answer, err := piping_webrtc_signaling.NewAnswer(logger, httpClient, pipingServerUrl, httpHeaders, peerConnection, answerSideId(path), offerSideId(path))
 		if err != nil {
-			errCh <- err
-			return
+			return err
 		}
 		if err := answer.Start(); err != nil {
-			errCh <- err
+			return err
 		}
-	}()
+		return nil
+	})
 
-	return <-errCh
+	return eg.Wait()
 }
 
 func tcpDialer(logger *log.Logger, peerConnection *webrtc.PeerConnection, port uint16) {
@@ -85,12 +92,22 @@ func tcpDialer(logger *log.Logger, peerConnection *webrtc.PeerConnection, port u
 			}
 			conn, err := net.Dial("tcp", ":"+strconv.Itoa(int(port)))
 			if err != nil {
-				logger.Printf("failed to dial", err)
-				raw.Close()
+				logger.Printf("failed to dial: %+v", err)
+				if err := raw.Close(); err != nil {
+					logger.Printf("failed to close raw: %+v", err)
+				}
 				return
 			}
-			go io.Copy(raw, conn)
-			go io.Copy(conn, raw)
+			go func() {
+				if _, err := io.Copy(raw, conn); err != nil {
+					logger.Printf("failed to copy conn to raw: %+v", err)
+				}
+			}()
+			go func() {
+				if _, err := io.Copy(conn, raw); err != nil {
+					logger.Printf("failed to copy raw to conn: %+v", err)
+				}
+			}()
 		})
 	})
 }
@@ -102,8 +119,10 @@ func udpDialer(logger *log.Logger, peerConnection *webrtc.PeerConnection, port u
 		// TODO: hard code: 127.0.0.1
 		conn, err := net.Dial("udp", net.JoinHostPort("127.0.0.1", strconv.Itoa(int(port))))
 		if err != nil {
-			log.Printf("failed to dial: %v", err)
-			d.Close()
+			log.Printf("failed to dial: %+v", err)
+			if err := d.Close(); err != nil {
+				log.Printf("failed to close: %+v", err)
+			}
 			return
 		}
 		// Register channel opening handling

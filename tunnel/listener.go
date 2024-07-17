@@ -6,6 +6,7 @@ import (
 	"fmt"
 	piping_webrtc_signaling "github.com/nwtgck/go-webrtc-piping/piping-webrtc-signaling"
 	"github.com/pion/webrtc/v3"
+	"golang.org/x/sync/errgroup"
 	"io"
 	"log"
 	"net"
@@ -16,7 +17,7 @@ import (
 
 func Listener(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, networkType NetworkType, port uint16, path string, webrtcConfig webrtc.Configuration) error {
 	logger.Printf("listener: offer-side")
-	errCh := make(chan error)
+	var eg errgroup.Group
 
 	var peerConnection *webrtc.PeerConnection
 	var err error
@@ -46,50 +47,54 @@ func Listener(logger *log.Logger, httpClient *http.Client, pipingServerUrl strin
 		return err
 	}
 
-	// Set the handler for Peer connection state
-	// This will notify you when the peer has connected/disconnected
-	peerConnection.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
-		logger.Printf("Peer Connection State has changed: %s\n", s.String())
+	eg.Go(func() error {
+		errCh := make(chan error)
+		// Set the handler for Peer connection state
+		// This will notify you when the peer has connected/disconnected
+		peerConnection.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
+			logger.Printf("Peer Connection State has changed: %s\n", s.String())
 
-		switch s {
-		case webrtc.PeerConnectionStateFailed:
-			// Wait until PeerConnection has had no network activity for 30 seconds or another failure. It may be reconnected using an ICE Restart.
-			// Use webrtc.PeerConnectionStateDisconnected if you are interested in detecting faster timeout.
-			// Note that the PeerConnection may come back from PeerConnectionStateDisconnected.
-			logger.Println("Peer Connection has gone to failed exiting")
-			errCh <- fmt.Errorf("PeerConnectionStateFailed")
-		case webrtc.PeerConnectionStateDisconnected:
-			errCh <- nil
-		}
+			switch s {
+			case webrtc.PeerConnectionStateFailed:
+				// Wait until PeerConnection has had no network activity for 30 seconds or another failure. It may be reconnected using an ICE Restart.
+				// Use webrtc.PeerConnectionStateDisconnected if you are interested in detecting faster timeout.
+				// Note that the PeerConnection may come back from PeerConnectionStateDisconnected.
+				logger.Println("Peer Connection has gone to failed exiting")
+				errCh <- fmt.Errorf("PeerConnectionStateFailed")
+			case webrtc.PeerConnectionStateDisconnected:
+				errCh <- nil
+			default:
+			}
+		})
+		return <-errCh
 	})
 
-	go func() {
+	eg.Go(func() error {
 		switch networkType {
 		case NetworkTypeTcp:
 			if err := tcpListener(logger, peerConnection, port); err != nil {
-				errCh <- err
-				return
+				return err
 			}
 		case NetworkTypeUdp:
 			if err := udpListener(logger, peerConnection, port); err != nil {
-				errCh <- err
-				return
+				return err
 			}
 		}
-	}()
+		return nil
+	})
 
-	go func() {
+	eg.Go(func() error {
 		offer, err := piping_webrtc_signaling.NewOffer(logger, httpClient, pipingServerUrl, httpHeaders, peerConnection, offerSideId(path), answerSideId(path))
 		if err != nil {
-			errCh <- err
-			return
+			return err
 		}
 		if err := offer.Start(); err != nil {
-			errCh <- err
+			return err
 		}
-	}()
+		return nil
+	})
 
-	return <-errCh
+	return eg.Wait()
 }
 
 func tcpListener(logger *log.Logger, peerConnection *webrtc.PeerConnection, port uint16) error {
@@ -114,8 +119,16 @@ func tcpListener(logger *log.Logger, peerConnection *webrtc.PeerConnection, port
 				logger.Printf("failed to detach: %+v", err)
 				return
 			}
-			go io.Copy(raw, conn)
-			go io.Copy(conn, raw)
+			go func() {
+				if _, err := io.Copy(raw, conn); err != nil {
+					logger.Printf("failed to copy conn to raw: %+v", err)
+				}
+			}()
+			go func() {
+				if _, err := io.Copy(conn, raw); err != nil {
+					logger.Printf("failed to copy raw to conn: %+v", err)
+				}
+			}()
 		})
 	}
 }
