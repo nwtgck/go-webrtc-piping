@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/pion/interceptor v0.1.37
-	github.com/pion/webrtc/v3 v3.3.3
+	github.com/pion/webrtc/v3 v3.3.4
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 )
@@ -15,7 +15,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/pion/datachannel v1.5.8 // indirect
 	github.com/pion/dtls/v2 v2.2.12 // indirect
-	github.com/pion/ice/v2 v2.3.35 // indirect
+	github.com/pion/ice/v2 v2.3.36 // indirect
 	github.com/pion/logging v0.2.2 // indirect
 	github.com/pion/mdns v0.0.12 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
