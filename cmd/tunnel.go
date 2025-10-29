@@ -19,12 +19,14 @@ var tunnelFlags struct {
 	verbose                bool
 	listens                bool
 	usesUdp                bool
+	restart                bool
 }
 
 func init() {
 	RootCmd.AddCommand(TunnelCmd)
 	TunnelCmd.Flags().BoolVarP(&tunnelFlags.listens, "listen", "l", false, "listen mode")
 	TunnelCmd.Flags().BoolVarP(&tunnelFlags.usesUdp, "udp", "u", false, "UDP")
+	TunnelCmd.Flags().BoolVarP(&tunnelFlags.restart, "restart", "r", false, "restarts tunnel after disconnection or error")
 }
 
 var TunnelCmd = &cobra.Command{
@@ -51,15 +53,24 @@ var TunnelCmd = &cobra.Command{
 		}
 
 		webrtcConfig := createWebrtcConfig()
-		if tunnelFlags.usesUdp {
-			if tunnelFlags.listens {
-				return tunnel.Listener(logger, httpClient, flags.pipingServerUrl, httpHeaders, tunnel.NetworkTypeUdp, addrStr, path, webrtcConfig)
+		runOnce := func() error {
+			if tunnelFlags.usesUdp {
+				if tunnelFlags.listens {
+					return tunnel.Listener(logger, httpClient, flags.pipingServerUrl, httpHeaders, tunnel.NetworkTypeUdp, addrStr, path, webrtcConfig)
+				}
+				return tunnel.Dialer(logger, httpClient, flags.pipingServerUrl, httpHeaders, tunnel.NetworkTypeUdp, addrStr, path, webrtcConfig)
 			}
-			return tunnel.Dialer(logger, httpClient, flags.pipingServerUrl, httpHeaders, tunnel.NetworkTypeUdp, addrStr, path, webrtcConfig)
+			if tunnelFlags.listens {
+				return tunnel.Listener(logger, httpClient, flags.pipingServerUrl, httpHeaders, tunnel.NetworkTypeTcp, addrStr, path, webrtcConfig)
+			}
+			return tunnel.Dialer(logger, httpClient, flags.pipingServerUrl, httpHeaders, tunnel.NetworkTypeTcp, addrStr, path, webrtcConfig)
 		}
-		if tunnelFlags.listens {
-			return tunnel.Listener(logger, httpClient, flags.pipingServerUrl, httpHeaders, tunnel.NetworkTypeTcp, addrStr, path, webrtcConfig)
+		if tunnelFlags.restart {
+			for {
+				_ = runOnce()
+			}
+		} else {
+			return runOnce()
 		}
-		return tunnel.Dialer(logger, httpClient, flags.pipingServerUrl, httpHeaders, tunnel.NetworkTypeTcp, addrStr, path, webrtcConfig)
 	},
 }
