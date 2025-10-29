@@ -4,17 +4,17 @@ package tunnel
 
 import (
 	"fmt"
-	piping_webrtc_signaling "github.com/nwtgck/go-webrtc-piping/piping-webrtc-signaling"
-	"github.com/pion/webrtc/v3"
 	"io"
 	"log"
 	"net"
 	"net/http"
-	"strconv"
 	"sync"
+
+	piping_webrtc_signaling "github.com/nwtgck/go-webrtc-piping/piping-webrtc-signaling"
+	"github.com/pion/webrtc/v3"
 )
 
-func Listener(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, networkType NetworkType, port uint16, path string, webrtcConfig webrtc.Configuration) error {
+func Listener(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, networkType NetworkType, bind string, path string, webrtcConfig webrtc.Configuration) error {
 	logger.Printf("listener: offer-side")
 	errCh := make(chan error)
 
@@ -66,12 +66,12 @@ func Listener(logger *log.Logger, httpClient *http.Client, pipingServerUrl strin
 	go func() {
 		switch networkType {
 		case NetworkTypeTcp:
-			if err := tcpListener(logger, peerConnection, port); err != nil {
+			if err := tcpListener(logger, peerConnection, bind); err != nil {
 				errCh <- err
 				return
 			}
 		case NetworkTypeUdp:
-			if err := udpListener(logger, peerConnection, port); err != nil {
+			if err := udpListener(logger, peerConnection, bind); err != nil {
 				errCh <- err
 				return
 			}
@@ -92,8 +92,8 @@ func Listener(logger *log.Logger, httpClient *http.Client, pipingServerUrl strin
 	return <-errCh
 }
 
-func tcpListener(logger *log.Logger, peerConnection *webrtc.PeerConnection, port uint16) error {
-	ln, err := net.Listen("tcp", ":"+strconv.Itoa(int(port)))
+func tcpListener(logger *log.Logger, peerConnection *webrtc.PeerConnection, bind string) error {
+	ln, err := net.Listen("tcp", bind)
 	if err != nil {
 		return err
 	}
@@ -136,7 +136,7 @@ func (m udpAddrToDataChannelMap) Store(key *net.UDPAddr, value *webrtc.DataChann
 	m.inner.Store(key.String(), value)
 }
 
-func udpListener(logger *log.Logger, peerConnection *webrtc.PeerConnection, port uint16) error {
+func udpListener(logger *log.Logger, peerConnection *webrtc.PeerConnection, bind string) error {
 	var ordered = false
 	var maxRetransmits uint16 = 0
 	dataChannelOptions := webrtc.DataChannelInit{
@@ -145,7 +145,7 @@ func udpListener(logger *log.Logger, peerConnection *webrtc.PeerConnection, port
 	}
 	raddrToDataChannel := udpAddrToDataChannelMap{inner: new(sync.Map)}
 
-	laddr, err := net.ResolveUDPAddr("udp", ":"+strconv.Itoa(int(port)))
+	laddr, err := net.ResolveUDPAddr("udp", bind)
 	if err != nil {
 		return err
 	}

@@ -2,11 +2,12 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/nwtgck/go-webrtc-piping/duplex"
-	"github.com/spf13/cobra"
 	"io"
 	"log"
 	"os"
+
+	"github.com/nwtgck/go-webrtc-piping/duplex"
+	"github.com/spf13/cobra"
 )
 
 var duplexFlags struct{}
@@ -16,7 +17,7 @@ func init() {
 }
 
 var DuplexCmd = &cobra.Command{
-	Use:   "duplex",
+	Use:   "duplex <tx_path> <rx_path>",
 	Short: "Duplex communication",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) != 2 {

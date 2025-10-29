@@ -4,16 +4,16 @@ package tunnel
 
 import (
 	"fmt"
-	piping_webrtc_signaling "github.com/nwtgck/go-webrtc-piping/piping-webrtc-signaling"
-	"github.com/pion/webrtc/v3"
 	"io"
 	"log"
 	"net"
 	"net/http"
-	"strconv"
+
+	piping_webrtc_signaling "github.com/nwtgck/go-webrtc-piping/piping-webrtc-signaling"
+	"github.com/pion/webrtc/v3"
 )
 
-func Dialer(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, networkType NetworkType, port uint16, path string, webrtcConfig webrtc.Configuration) error {
+func Dialer(logger *log.Logger, httpClient *http.Client, pipingServerUrl string, httpHeaders [][]string, networkType NetworkType, dest string, path string, webrtcConfig webrtc.Configuration) error {
 	logger.Printf("answer-side")
 	errCh := make(chan error)
 
@@ -52,9 +52,9 @@ func Dialer(logger *log.Logger, httpClient *http.Client, pipingServerUrl string,
 	})
 	switch networkType {
 	case NetworkTypeTcp:
-		tcpDialer(logger, peerConnection, port)
+		tcpDialer(logger, peerConnection, dest)
 	case NetworkTypeUdp:
-		udpDialer(logger, peerConnection, port)
+		udpDialer(logger, peerConnection, dest)
 	}
 
 	go func() {
@@ -71,7 +71,7 @@ func Dialer(logger *log.Logger, httpClient *http.Client, pipingServerUrl string,
 	return <-errCh
 }
 
-func tcpDialer(logger *log.Logger, peerConnection *webrtc.PeerConnection, port uint16) {
+func tcpDialer(logger *log.Logger, peerConnection *webrtc.PeerConnection, dest string) {
 	// Register data channel creation handling
 	peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
 		logger.Printf("OnDataChannel")
@@ -83,7 +83,7 @@ func tcpDialer(logger *log.Logger, peerConnection *webrtc.PeerConnection, port u
 				logger.Printf("failed to detach: %+v", err)
 				return
 			}
-			conn, err := net.Dial("tcp", ":"+strconv.Itoa(int(port)))
+			conn, err := net.Dial("tcp", dest)
 			if err != nil {
 				logger.Printf("failed to dial", err)
 				raw.Close()
@@ -95,12 +95,11 @@ func tcpDialer(logger *log.Logger, peerConnection *webrtc.PeerConnection, port u
 	})
 }
 
-func udpDialer(logger *log.Logger, peerConnection *webrtc.PeerConnection, port uint16) {
+func udpDialer(logger *log.Logger, peerConnection *webrtc.PeerConnection, dest string) {
 	// Register data channel creation handling
 	peerConnection.OnDataChannel(func(d *webrtc.DataChannel) {
 		logger.Printf("OnDataChannel")
-		// TODO: hard code: 127.0.0.1
-		conn, err := net.Dial("udp", net.JoinHostPort("127.0.0.1", strconv.Itoa(int(port))))
+		conn, err := net.Dial("udp", dest)
 		if err != nil {
 			log.Printf("failed to dial: %v", err)
 			d.Close()
