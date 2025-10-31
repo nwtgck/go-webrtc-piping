@@ -21,26 +21,26 @@ Get more executables in the [releases](https://github.com/nwtgck/go-webrtc-pipin
 
 ## TCP tunneling
 
-The following command forwards 8888 port to 9999 port.   
+The following command forwards incoming connections to the 9999 port side to the 8888 port side
 
 ```bash
-webrtc-piping tunnel 8888 mypath 
+webrtc-piping tunnel 127.0.0.1:8888 mypath 
 ```
 
 ```bash
-webrtc-piping tunnel -l 9999 mypath
+webrtc-piping tunnel -l 127.0.0.1:9999 mypath
 ```
 
 ## UDP tunneling
 
-Adding -u or --udp option forwards UDP port.
+Adding -u or --udp option forwards UDP port. Return paths are forwarded as well
 
 ```bash
-webrtc-piping tunnel -u 8888 mypath 
+webrtc-piping tunnel -u 127.0.0.1:8888 mypath 
 ```
 
 ```bash
-webrtc-piping tunnel -ul 9999 mypath
+webrtc-piping tunnel -ul 127.0.0.1:9999 mypath
 ```
 
 ## Full-duplex
